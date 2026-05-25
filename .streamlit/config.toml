@@ -1,1 +1,6 @@
-
+[theme]
+primaryColor = "#2EC4B6"          # Premium Teal (CTAs & AI signals)
+backgroundColor = "#F7F9FC"       # Calm Clinical Page Background
+secondaryBackgroundColor = "#FFFFFF" # Crisp White Card Surfaces
+textColor = "#1F2937"             # Readable Dark Grey Body Text
+font = "sans serif"               # Clean Inter-style Typography
