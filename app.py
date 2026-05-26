@@ -1,5 +1,5 @@
-# app.py - CardioShield AI Streamlit App (Fixed version)
-# Key fixes: unique keys for all widgets, width='stretch' instead of use_container_width=True
+# app.py - CardioShield AI Streamlit App
+# Professional icon set via Font Awesome 6.5.1
 
 import streamlit as st
 import numpy as np
@@ -28,13 +28,15 @@ st.set_page_config(
 )
 
 # ============================================================================
-# CUSTOM CSS THEME
+# CUSTOM CSS THEME + FONT AWESOME
 # ============================================================================
 
 def inject_custom_css():
+    # Load Font Awesome
+    st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">', unsafe_allow_html=True)
+    
     st.markdown("""
     <style>
-        /* Root variables */
         :root {
             --navy: #0B1F3A;
             --navy-hover: #122b4d;
@@ -121,6 +123,11 @@ def inject_custom_css():
             border-radius: 12px;
             padding: 1rem;
             backdrop-filter: blur(10px);
+            transition: background 0.2s;
+        }
+        
+        .kpi-card:hover {
+            background: rgba(255,255,255,0.1);
         }
         
         .result-card {
@@ -185,8 +192,77 @@ def inject_custom_css():
             transform: translateY(-1px);
             box-shadow: 0 4px 16px rgba(11, 31, 58, 0.3);
         }
+        
+        /* Investor page card styling */
+        .investor-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .investor-card-red {
+            border-top: 4px solid #EF4444;
+        }
+        
+        .investor-card-teal {
+            border-top: 4px solid #2EC4B6;
+        }
+        
+        .icon-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .icon-circle-red {
+            background: #FEE2E2;
+        }
+        
+        .icon-circle-teal {
+            background: #D1FAE5;
+        }
+        
+        /* Streamlit tab styling overrides */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 0.5rem;
+            background: white;
+            border-radius: 16px;
+            padding: 0.5rem;
+            border: 1px solid #E2E8F0;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            border-radius: 12px;
+            padding: 0.5rem 1.5rem;
+            font-weight: 600;
+            color: #6B7280;
+        }
+        
+        .stTabs [aria-selected="true"] {
+            background: #0B1F3A;
+            color: white;
+        }
     </style>
     """, unsafe_allow_html=True)
+
+# ============================================================================
+# ICON HELPERS
+# ============================================================================
+
+def icon(name, size="", color="", cls=""):
+    """Generate Font Awesome icon HTML"""
+    size_style = f"font-size:{size};" if size else ""
+    color_style = f"color:{color};" if color else ""
+    style = f'style="{size_style}{color_style}"' if (size_style or color_style) else ""
+    return f'<i class="fa-solid {name} {cls}" {style}></i>'
+
+def icon_fw(name, size="", color=""):
+    """Fixed-width icon"""
+    return icon(name, size, color, "fa-fw")
 
 # ============================================================================
 # MODEL MANAGEMENT
@@ -195,9 +271,9 @@ def inject_custom_css():
 MODEL_DIR = Path("models")
 MODEL_DIR.mkdir(exist_ok=True)
 
-PREPROCESSOR_URL = "https://github.com/FranklinObika/cardioshield-ai/releases/download/v1.0.0/preprocessor.pkl"
-RF_MODEL_URL = "https://github.com/FranklinObika/cardioshield-ai/releases/download/v1.0.0/rf_model.pkl"
-VGG16_MODEL_URL = "https://github.com/FranklinObika/cardioshield-ai/releases/download/v1.0.0/vgg16_ecg_model.keras"
+PREPROCESSOR_URL = "https://github.com/Obika-Franklin/cardioshield-ai/releases/download/preprocessor/preprocessor.pkl"
+RF_MODEL_URL = "https://github.com/Obika-Franklin/cardioshield-ai/releases/download/rf_model/rf_model.pkl"
+VGG16_MODEL_URL = "https://github.com/Obika-Franklin/cardioshield-ai/releases/download/v1.0.0/vgg16_ecg_model.keras"
 
 @st.cache_resource
 def download_file(url, filename):
@@ -290,13 +366,13 @@ def predict_rf(patient_data, preprocessor, rf_model):
         
         if risk_score >= 70:
             risk_level = "high"
-            recommendation = "Patient exhibits multiple cardiovascular risk factors. Immediate cardiology referral recommended."
+            recommendation = "Patient exhibits multiple cardiovascular risk factors. Immediate cardiology referral recommended. Consider stress testing and comprehensive lipid panel."
         elif risk_score >= 30:
             risk_level = "moderate"
-            recommendation = "Moderate cardiovascular risk detected. Monitor patient closely. Follow-up in 3-6 months."
+            recommendation = "Moderate cardiovascular risk detected. Monitor patient closely and consider lifestyle interventions. Follow-up in 3-6 months with repeat assessment."
         else:
             risk_level = "low"
-            recommendation = "Low cardiovascular risk profile. Continue routine preventive care."
+            recommendation = "Low cardiovascular risk profile. Continue routine preventive care. Maintain healthy lifestyle and schedule annual check-up."
         
         features = []
         if hasattr(rf_model, 'feature_importances_'):
@@ -342,7 +418,7 @@ def simulate_rf_prediction(patient_data):
     if risk_level == "high":
         recommendation = "Patient exhibits multiple cardiovascular risk factors. Immediate cardiology referral recommended."
     elif risk_level == "moderate":
-        recommendation = "Moderate cardiovascular risk detected. Monitor patient closely."
+        recommendation = "Moderate cardiovascular risk detected. Monitor patient closely and consider lifestyle interventions."
     else:
         recommendation = "Low cardiovascular risk profile. Continue routine preventive care."
     
@@ -388,10 +464,10 @@ def predict_ecg(image_data, vgg16_model):
         classification = classes[predicted_idx]
         
         findings_map = {
-            'normal': "Normal sinus rhythm. Regular P-QRS-T waveform pattern.",
-            'myocardial_infarction': "ST segment elevation detected. Pathological Q waves present.",
-            'history_mi': "Residual Q waves detected. T-wave inversion noted.",
-            'abnormal_heartbeat': "Irregular rhythm pattern. Varying QRS amplitudes."
+            'normal': "Normal sinus rhythm. Regular P-QRS-T waveform pattern. No ST segment abnormalities detected. Heart rate within normal range.",
+            'myocardial_infarction': "ST segment elevation detected. Pathological Q waves present. Findings consistent with acute myocardial infarction. Urgent cardiology evaluation required.",
+            'history_mi': "Residual Q waves detected. T-wave inversion noted. Findings suggest prior myocardial infarction. Continued monitoring and follow-up recommended.",
+            'abnormal_heartbeat': "Irregular rhythm pattern detected. Varying QRS amplitudes. Abnormal heartbeat morphology. Further diagnostic workup advised."
         }
         
         risk_map = {'normal': 'low', 'myocardial_infarction': 'high', 'history_mi': 'moderate', 'abnormal_heartbeat': 'moderate'}
@@ -413,7 +489,7 @@ def simulate_ecg_prediction(is_demo=True):
     return {
         "classification": "Normal Sinus Rhythm",
         "confidence": 0.92,
-        "findings": "Regular P-QRS-T waveform pattern. No ST segment abnormalities detected.",
+        "findings": "Regular P-QRS-T waveform pattern. No ST segment abnormalities detected. Heart rate within normal range.",
         "riskLevel": "low",
         "modelAccuracy": 0.7483,
         "modelName": "CNN VGG16",
@@ -444,9 +520,9 @@ def combine_results(rf_result, ecg_result=None):
     confidence_score = (rf_result["rfProbability"] + ecg_result["confidence"]) / 2
     
     recommendations = {
-        "high": "Combined analysis indicates HIGH cardiovascular risk. Urgent cardiology referral required.",
-        "moderate": "Combined analysis indicates MODERATE cardiovascular risk. Further diagnostic testing recommended.",
-        "low": "Combined analysis indicates LOW cardiovascular risk. Routine preventive care recommended."
+        "high": "Combined RF + VGG16 analysis indicates HIGH cardiovascular risk. Urgent cardiology referral required. Both structured vitals and ECG morphology suggest significant pathology. Immediate clinical action recommended.",
+        "moderate": "Combined analysis indicates MODERATE cardiovascular risk. Further diagnostic testing recommended. Monitor patient symptoms and schedule follow-up within 1-3 months.",
+        "low": "Combined analysis indicates LOW cardiovascular risk. Routine preventive care recommended. Both models agree on low-risk classification. Continue annual check-ups."
     }
     
     return {
@@ -471,9 +547,13 @@ def render_risk_gauge(score, risk_level):
         value=score,
         domain={'x': [0, 1], 'y': [0, 1]},
         title={'text': "Cardiovascular Risk", 'font': {'size': 14, 'color': '#0B1F3A'}},
+        number={'suffix': '%', 'font': {'size': 36, 'color': '#0B1F3A', 'family': 'Segoe UI'}},
         gauge={
-            'axis': {'range': [0, 100]},
+            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "#9CA3AF"},
             'bar': {'color': gauge_color, 'thickness': 0.15},
+            'bgcolor': "white",
+            'borderwidth': 1,
+            'bordercolor': "#E2E8F0",
             'steps': [
                 {'range': [0, 30], 'color': '#E6F7F5'},
                 {'range': [30, 70], 'color': '#FEF3C7'},
@@ -481,7 +561,8 @@ def render_risk_gauge(score, risk_level):
             ],
         }
     ))
-    fig.update_layout(height=250, margin=dict(l=30, r=30, t=50, b=20))
+    fig.update_layout(height=250, margin=dict(l=30, r=30, t=50, b=20),
+                      paper_bgcolor='rgba(0,0,0,0)', font={'color': '#0B1F3A', 'family': 'Segoe UI'})
     return fig
 
 def render_feature_importance_chart(features):
@@ -490,7 +571,9 @@ def render_feature_importance_chart(features):
     fig = px.bar(df, x='importance', y='name', orientation='h',
                  title='Feature Importance (Random Forest)',
                  color='importance', color_continuous_scale=['#E6F7F5', '#2EC4B6', '#0B1F3A'])
-    fig.update_layout(height=350, margin=dict(l=10, r=10, t=40, b=10))
+    fig.update_layout(height=350, margin=dict(l=10, r=10, t=40, b=10),
+                      paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                      font={'color': '#0B1F3A'}, xaxis_title="Importance", yaxis_title="")
     return fig
 
 def render_ecg_probability_chart(probabilities):
@@ -503,16 +586,19 @@ def render_ecg_probability_chart(probabilities):
     for i, (label, value) in enumerate(zip(labels, values)):
         fig.add_trace(go.Bar(y=[label], x=[value], orientation='h',
                             marker_color='#10B981' if i == 0 else '#CBD5E1',
-                            text=f'{value:.1f}%', textposition='outside'))
+                            text=f'{value:.1f}%', textposition='outside',
+                            textfont={'color': '#0B1F3A', 'size': 12}))
     fig.update_layout(title='CNN Class Probabilities', height=200,
-                      margin=dict(l=10, r=50, t=40, b=10), showlegend=False)
+                      margin=dict(l=10, r=50, t=40, b=10), showlegend=False,
+                      paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                      font={'color': '#0B1F3A'})
     return fig
 
 def risk_badge_html(level):
     badges = {
-        "high": '<span class="risk-badge-high">⚠ HIGH RISK</span>',
-        "moderate": '<span class="risk-badge-moderate">⚡ MODERATE RISK</span>',
-        "low": '<span class="risk-badge-low">✅ LOW RISK</span>'
+        "high": f'<span class="risk-badge-high">{icon("fa-triangle-exclamation")} HIGH RISK</span>',
+        "moderate": f'<span class="risk-badge-moderate">{icon("fa-circle-exclamation")} MODERATE RISK</span>',
+        "low": f'<span class="risk-badge-low">{icon("fa-circle-check")} LOW RISK</span>'
     }
     return badges.get(level, badges["low"])
 
@@ -601,9 +687,9 @@ def generate_pdf_html(data):
         rf_section = f'''
         <div class="section">
             <div class="section-title">Random Forest + SMOTE Analysis</div>
-            <div class="model-badge">RF + SMOTE • Accuracy: {rf.get("modelAccuracy", 0.92) * 100:.2f}%</div>
+            <div class="model-badge">RF + SMOTE &bull; Accuracy: {rf.get("modelAccuracy", 0.92) * 100:.2f}%</div>
             <div class="risk-badge" style="background:{risk_color(rf["riskLevel"])}">
-                {risk_label(rf["riskLevel"])} — Score: {rf["riskScore"]:.1f}/100
+                {risk_label(rf["riskLevel"])} &mdash; Score: {rf["riskScore"]:.1f}/100
             </div>
             <div class="findings">{rf["recommendation"]}</div>
         </div>'''
@@ -614,9 +700,9 @@ def generate_pdf_html(data):
         ecg_section = f'''
         <div class="section">
             <div class="section-title">VGG16 ECG Classification</div>
-            <div class="model-badge">CNN VGG16 • Accuracy: {ecg.get("modelAccuracy", 0.75) * 100:.2f}%</div>
+            <div class="model-badge">CNN VGG16 &bull; Accuracy: {ecg.get("modelAccuracy", 0.75) * 100:.2f}%</div>
             <div class="risk-badge" style="background:{risk_color(ecg["riskLevel"])}">
-                {ecg["classification"]} — Confidence: {ecg["confidence"] * 100:.1f}%
+                {ecg["classification"]} &mdash; Confidence: {ecg["confidence"] * 100:.1f}%
             </div>
             <div class="findings">{ecg["findings"]}</div>
         </div>'''
@@ -627,7 +713,7 @@ def generate_pdf_html(data):
         <div class="section combined">
             <div class="section-title">Combined Triage Assessment</div>
             <div class="risk-badge" style="background:{risk_color(data["finalRiskLevel"])}">
-                {risk_label(data["finalRiskLevel"])} — Confidence: {(data.get("confidenceScore", 0) * 100):.1f}%
+                {risk_label(data["finalRiskLevel"])} &mdash; Confidence: {(data.get("confidenceScore", 0) * 100):.1f}%
             </div>
             <div class="findings">{data.get("finalRecommendation", "")}</div>
         </div>'''
@@ -636,7 +722,7 @@ def generate_pdf_html(data):
 <html lang="en">
 <head>
     <meta charset="UTF-8"/>
-    <title>CardioShield AI — Clinical Report</title>
+    <title>CardioShield AI &mdash; Clinical Report</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{ font-family: 'Segoe UI', Arial, sans-serif; color: #212121; padding: 40px; }}
@@ -665,14 +751,15 @@ def generate_pdf_html(data):
     {ecg_section}
     {combined_section}
     <div class="disclaimer"><strong>Clinical Disclaimer:</strong> CardioShield AI is a clinical decision support tool only. This report does NOT constitute a medical diagnosis.</div>
-    <div class="footer">CardioShield AI • RF+SMOTE 92.02% • VGG16 74.83%</div>
+    <div class="footer">CardioShield AI &bull; RF+SMOTE 92.02% &bull; VGG16 74.83%</div>
 </body>
 </html>'''
 
-def pdf_download_button(pdf_data, label="📥 Download Clinical Report"):
+def pdf_download_button(pdf_data, label="Download Clinical Report"):
     pdf_html = generate_pdf_html(pdf_data)
     b64 = base64.b64encode(pdf_html.encode()).decode()
-    href = f'<a href="data:text/html;base64,{b64}" download="CardioShield_Report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.html"><button style="width:100%;margin-top:16px;padding:12px;background:#0B1F3A;color:white;border:none;border-radius:12px;font-weight:700;cursor:pointer;">{label}</button></a>'
+    icon_html = icon("fa-file-pdf")
+    href = f'<a href="data:text/html;base64,{b64}" download="CardioShield_Report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.html"><button style="width:100%;margin-top:16px;padding:12px;background:#0B1F3A;color:white;border:none;border-radius:12px;font-weight:700;cursor:pointer;">{icon_html} {label}</button></a>'
     st.markdown(href, unsafe_allow_html=True)
 
 # ============================================================================
@@ -702,13 +789,20 @@ def main():
     # HEADER
     # ========================================================================
     
-    st.markdown("""
+    header_shield = icon("fa-shield-halved", "24px", "#fff")
+    header_bolt = icon("fa-bolt", "", "#2EC4B6")
+    header_chart = icon("fa-chart-line", "", "#2EC4B6")
+    header_clock = icon("fa-stopwatch", "", "#2EC4B6")
+    header_db = icon("fa-database", "", "#2EC4B6")
+    
+    st.markdown(f"""
     <div class="custom-header">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <div style="display: flex; align-items: center; gap: 12px;">
                 <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #2EC4B6, #25a99d); 
-                     border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                    <span style="font-size: 24px;">🛡️</span>
+                     border-radius: 12px; display: flex; align-items: center; justify-content: center; 
+                     box-shadow: 0 4px 12px rgba(46, 196, 182, 0.3);">
+                    {header_shield}
                 </div>
                 <div>
                     <h1 style="color: white; margin: 0; font-size: 1.5rem; font-weight: 700;">CardioShield AI</h1>
@@ -718,38 +812,38 @@ def main():
         </div>
         <div style="display: flex; gap: 12px; margin-top: 20px; overflow-x: auto;">
             <div class="kpi-card" style="flex:1;min-width:150px;">
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <span style="color:#2EC4B6;">⚡</span>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="padding:8px;background:rgba(46,196,182,0.15);border-radius:8px;">{header_bolt}</div>
                     <div>
                         <p style="color:white;font-weight:700;margin:0;font-size:0.85rem;">RF + SMOTE</p>
-                        <p style="color:rgba(255,255,255,0.5);margin:0;font-size:0.7rem;">1,200 records</p>
+                        <p style="color:rgba(255,255,255,0.5);margin:0;font-size:0.7rem;">1,200 patient records</p>
                     </div>
                 </div>
             </div>
             <div class="kpi-card" style="flex:1;min-width:150px;">
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <span style="color:#2EC4B6;">📊</span>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="padding:8px;background:rgba(46,196,182,0.15);border-radius:8px;">{header_chart}</div>
                     <div>
                         <p style="color:white;font-weight:700;margin:0;font-size:0.85rem;">VGG16 ECG</p>
-                        <p style="color:rgba(255,255,255,0.5);margin:0;font-size:0.7rem;">2,500 images</p>
+                        <p style="color:rgba(255,255,255,0.5);margin:0;font-size:0.7rem;">2,500 ECG images</p>
                     </div>
                 </div>
             </div>
             <div class="kpi-card" style="flex:1;min-width:150px;">
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <span style="color:#2EC4B6;">⏱️</span>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="padding:8px;background:rgba(46,196,182,0.15);border-radius:8px;">{header_clock}</div>
                     <div>
                         <p style="color:white;font-weight:700;margin:0;font-size:0.85rem;">Rapid</p>
-                        <p style="color:rgba(255,255,255,0.5);margin:0;font-size:0.7rem;">Inference time</p>
+                        <p style="color:rgba(255,255,255,0.5);margin:0;font-size:0.7rem;">Inference response time</p>
                     </div>
                 </div>
             </div>
             <div class="kpi-card" style="flex:1;min-width:150px;">
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <span style="color:#2EC4B6;">🗄️</span>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="padding:8px;background:rgba(46,196,182,0.15);border-radius:8px;">{header_db}</div>
                     <div>
                         <p style="color:white;font-weight:700;margin:0;font-size:0.85rem;">3,700+</p>
-                        <p style="color:rgba(255,255,255,0.5);margin:0;font-size:0.7rem;">Data points</p>
+                        <p style="color:rgba(255,255,255,0.5);margin:0;font-size:0.7rem;">Combined data points</p>
                     </div>
                 </div>
             </div>
@@ -761,19 +855,32 @@ def main():
     # TABS
     # ========================================================================
     
-    tab1, tab2, tab3, tab4 = st.tabs(["🔬 Dual Mode", "📈 ECG-Only", "📊 Data-Only", "💼 Investor Brief"])
+    tab_icons = {
+        "dual": icon("fa-microscope"),
+        "ecg": icon("fa-heart-pulse"),
+        "data": icon("fa-table"),
+        "investor": icon("fa-briefcase")
+    }
+    
+    tab1, tab2, tab3, tab4 = st.tabs([
+        f"{tab_icons['dual']} Dual Mode",
+        f"{tab_icons['ecg']} ECG-Only",
+        f"{tab_icons['data']} Data-Only",
+        f"{tab_icons['investor']} Investor Brief"
+    ])
     
     # ========================================================================
     # TAB 1: DUAL MODE
     # ========================================================================
     
     with tab1:
-        st.markdown("""
+        st.markdown(f"""
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
             <span style="padding:4px 12px;border-radius:8px;border:1.5px solid rgba(46,196,182,0.35);
                   background:rgba(46,196,182,0.06);color:#0B1F3A;font-size:11px;font-weight:700;
-                  text-transform:uppercase;letter-spacing:0.1em;">🔬 Dual Mode · RF + CNN VGG16</span>
-            <span style="color:#6B7280;font-size:0.85rem;">Patient vitals + ECG combined</span>
+                  text-transform:uppercase;letter-spacing:0.1em;">
+                  {icon("fa-microscope", "", "#2EC4B6")} Dual Mode &middot; RF + CNN VGG16</span>
+            <span style="color:#6B7280;font-size:0.85rem;">Patient vitals + ECG combined for maximum triage accuracy</span>
         </div>
         """, unsafe_allow_html=True)
         
@@ -801,7 +908,8 @@ def main():
                 fbs = st.toggle("Fasting Blood Sugar >120", key="dual_fbs")
                 ex_angina = st.toggle("Exercise Induced Angina", key="dual_ex_angina")
             
-            if st.button("Analyze Patient Data", type="primary", use_container_width=True, key="dual_analyze_btn"):
+            analyze_icon = icon("fa-stethoscope")
+            if st.button(f"{analyze_icon} Analyze Patient Data", type="primary", use_container_width=True, key="dual_analyze_btn"):
                 patient_data = {
                     "patientName": patient_name, "age": age, "sex": sex,
                     "chestPainType": chest_pain, "restingBpS": resting_bp,
@@ -809,7 +917,7 @@ def main():
                     "restingEcg": resting_ecg, "maxHeartRate": max_hr,
                     "exerciseAngina": 1 if ex_angina else 0, "oldpeak": oldpeak, "stSlope": st_slope
                 }
-                with st.spinner("Running analysis..."):
+                with st.spinner("Running dual-model analysis..."):
                     st.session_state.rf_result = predict_rf(patient_data, preprocessor, rf_model)
                     if st.session_state.ecg_image:
                         st.session_state.ecg_result = predict_ecg(st.session_state.ecg_image, vgg16_model)
@@ -829,7 +937,7 @@ def main():
             
             current_idx = sample_options.index(st.session_state.ecg_sample) if st.session_state.ecg_sample in sample_options else 0
             
-            selected = st.selectbox("Select demo sample", range(len(sample_options)),
+            selected = st.selectbox("Select demo sample or upload below", range(len(sample_options)),
                                     format_func=lambda i: sample_labels[i], index=current_idx, key="dual_sample_select")
             
             if sample_options[selected] is not None:
@@ -840,28 +948,31 @@ def main():
             else:
                 st.session_state.ecg_sample = None
             
-            uploaded_file = st.file_uploader("Upload ECG Image (PNG, JPG)", type=["png", "jpg", "jpeg"], key="dual_ecg_upload")
+            uploaded_file = st.file_uploader("Upload ECG Image (PNG, JPG up to 20MB)", type=["png", "jpg", "jpeg"], key="dual_ecg_upload")
             if uploaded_file:
                 st.session_state.ecg_sample = None
                 st.session_state.ecg_image = base64.b64encode(uploaded_file.getvalue()).decode()
                 st.image(uploaded_file, caption="Uploaded ECG", width='stretch')
             
             if not st.session_state.ecg_sample and not st.session_state.ecg_image:
-                st.info("ℹ️ No ECG selected — RF + SMOTE will still run. Add an ECG to enable dual-model triage.")
+                st.info(f"{icon('fa-circle-info', '', '#2EC4B6')} No ECG selected — RF + SMOTE will still run on patient vitals. Select a sample or upload an ECG to enable dual-model triage.")
         
         # Results
         if st.session_state.dual_result:
             st.markdown("---")
+            st.markdown("### Results")
             dual = st.session_state.dual_result
             
             if not dual.get("ecgProvided"):
-                st.warning("⚠️ ECG not provided — showing RF analysis only.")
+                st.warning(f"{icon('fa-triangle-exclamation')} ECG was not provided — results show Random Forest analysis only. Add an ECG input for dual-model combined triage.")
             
             rc1, rc2 = st.columns([1, 1] if dual.get("ecgProvided") else [1])
             
             with rc1:
                 st.markdown("<div class='result-card'>", unsafe_allow_html=True)
                 st.markdown("#### Random Forest + SMOTE")
+                st.caption("Structured patient vitals — 11 clinical features")
+                
                 rf = dual["rfResult"]
                 st.markdown(risk_badge_html(rf["riskLevel"]), unsafe_allow_html=True)
                 st.plotly_chart(render_risk_gauge(rf["riskScore"], rf["riskLevel"]), use_container_width=True, key="dual_rf_gauge")
@@ -870,7 +981,8 @@ def main():
                     if fig: st.plotly_chart(fig, use_container_width=True, key="dual_rf_features")
                 st.markdown(f"""
                 <div style="background:#F7F9FC;padding:16px;border-radius:12px;border:1px solid #E2E8F0;margin-top:12px;">
-                    <p style="font-size:0.7rem;font-weight:700;color:#0B1F3A;text-transform:uppercase;">Clinical Interpretation</p>
+                    <p style="font-size:0.7rem;font-weight:700;color:#0B1F3A;text-transform:uppercase;">
+                        {icon("fa-circle-info", "", "#2EC4B6")} Clinical Interpretation</p>
                     <p style="font-size:0.85rem;color:#4B5563;">{rf["recommendation"]}</p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -880,20 +992,28 @@ def main():
                 with rc2:
                     st.markdown("<div class='result-card'>", unsafe_allow_html=True)
                     st.markdown("#### CNN VGG16 ECG")
+                    st.caption("Waveform morphology classification")
+                    
                     ecg = dual["ecgResult"]
                     is_normal = ecg["riskLevel"] == "low"
                     conf_pct = int(ecg["confidence"] * 100)
                     
+                    result_icon = icon("fa-circle-check", "2rem", "#10B981") if is_normal else icon("fa-triangle-exclamation", "2rem", "#EF4444")
+                    
                     st.markdown(f"""
                     <div style="border-radius:16px;padding:16px;border:1px solid {'#D1FAE5' if is_normal else '#FEE2E2'};
                          background:{'#ECFDF5' if is_normal else '#FEF2F2'};margin:12px 0;">
-                        <span style="font-size:2rem;">{'✅' if is_normal else '⚠️'}</span>
-                        <h4 style="color:#0B1F3A;margin:4px 0;">{'Normal Sinus Rhythm' if is_normal else 'Anomaly Detected'}</h4>
-                        <p style="color:#6B7280;font-size:0.8rem;">{ecg["classification"]}</p>
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            {result_icon}
+                            <div>
+                                <h4 style="color:#0B1F3A;margin:0;">{'Normal Sinus Rhythm' if is_normal else 'Anomaly Detected'}</h4>
+                                <p style="color:#6B7280;font-size:0.8rem;margin:0;">{ecg["classification"]}</p>
+                            </div>
+                        </div>
                     </div>
-                    <div style="background:#F7F9FC;padding:16px;border-radius:12px;border:1px solid #E2E8F0;">
-                        <div style="display:flex;justify-content:space-between;">
-                            <span style="font-size:0.7rem;font-weight:700;color:#6B7280;">Model Confidence</span>
+                    <div style="background:#F7F9FC;padding:16px;border-radius:12px;border:1px solid #E2E8F0;margin:12px 0;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:0.7rem;font-weight:700;color:#6B7280;text-transform:uppercase;">Model Confidence</span>
                             <span style="font-size:1.5rem;font-weight:800;color:#0B1F3A;">{conf_pct}%</span>
                         </div>
                         <div style="height:12px;background:#E2E8F0;border-radius:999px;overflow:hidden;margin-top:8px;">
@@ -908,7 +1028,8 @@ def main():
                     
                     st.markdown(f"""
                     <div style="background:#F7F9FC;padding:16px;border-radius:12px;border:1px solid #E2E8F0;margin-top:12px;">
-                        <p style="font-size:0.7rem;font-weight:700;color:#0B1F3A;text-transform:uppercase;">Key Findings</p>
+                        <p style="font-size:0.7rem;font-weight:700;color:#0B1F3A;text-transform:uppercase;">
+                            {icon("fa-magnifying-glass-chart", "", "#2EC4B6")} Key Findings</p>
                         <p style="font-size:0.85rem;color:#4B5563;">{ecg["findings"]}</p>
                     </div>
                     """, unsafe_allow_html=True)
@@ -917,20 +1038,24 @@ def main():
             # Combined result
             frl = dual["finalRiskLevel"]
             colors = {"high": ("#EF4444", "#FEF2F2"), "moderate": ("#F59E0B", "#FFF7ED"), "low": ("#2EC4B6", "#ECFDF5")}
-            icons = {"high": "⚠️", "moderate": "⚡", "low": "✅"}
+            icons_map = {
+                "high": icon("fa-triangle-exclamation", "2rem", "#EF4444"),
+                "moderate": icon("fa-circle-exclamation", "2rem", "#F59E0B"),
+                "low": icon("fa-circle-check", "2rem", "#2EC4B6")
+            }
             
             st.markdown(f"""
-            <div style="border:2px solid {colors[frl][0]};border-radius:16px;padding:20px;background:{colors[frl][1]};margin-top:16px;">
+            <div style="border:2px solid {colors[frl][0]};border-radius:16px;padding:24px;background:{colors[frl][1]};margin-top:16px;">
                 <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
-                    <span style="font-size:2rem;">{icons[frl]}</span>
+                    {icons_map[frl]}
                     <div>
-                        <span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6B7280;">Consensus Triage</span>
-                        <h3 style="margin:4px 0;color:#0B1F3A;text-transform:capitalize;">{frl} Risk</h3>
+                        <span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6B7280;letter-spacing:0.1em;">Consensus Triage</span>
+                        <h3 style="margin:4px 0;color:#0B1F3A;text-transform:capitalize;font-size:1.5rem;">{frl} Risk</h3>
                         <span style="font-size:0.75rem;color:#6B7280;">{(dual["confidenceScore"] * 100):.1f}% Confidence</span>
                     </div>
                 </div>
                 <div style="background:white;padding:16px;border-radius:12px;">
-                    <p style="color:#4B5563;">{dual["finalRecommendation"]}</p>
+                    <p style="color:#4B5563;font-size:0.9rem;">{dual["finalRecommendation"]}</p>
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -942,7 +1067,7 @@ def main():
                 "finalRecommendation": dual["finalRecommendation"],
                 "confidenceScore": dual["confidenceScore"]
             }
-            pdf_download_button(pdf_data)
+            pdf_download_button(pdf_data, "Download Clinical Report (PDF)")
     
     # ========================================================================
     # TAB 2: ECG-ONLY
@@ -972,6 +1097,7 @@ def main():
                 st.session_state.ecg_sample = None
             
             st.markdown("---")
+            st.caption("or upload an ECG image")
             uploaded_file = st.file_uploader("Upload ECG Image", type=["png", "jpg", "jpeg"], key="ecg_only_upload")
             if uploaded_file:
                 st.session_state.ecg_sample = None
@@ -980,9 +1106,10 @@ def main():
             
             has_ecg = bool(st.session_state.ecg_sample or st.session_state.ecg_image)
             
-            if st.button("Analyze ECG", type="primary", use_container_width=True, disabled=not has_ecg, key="ecg_only_analyze"):
+            scan_icon = icon("fa-magnifying-glass")
+            if st.button(f"{scan_icon} Analyze ECG", type="primary", use_container_width=True, disabled=not has_ecg, key="ecg_only_analyze"):
                 if st.session_state.ecg_image:
-                    with st.spinner("Processing..."):
+                    with st.spinner("Processing ECG image with CNN VGG16..."):
                         st.session_state.ecg_result = predict_ecg(st.session_state.ecg_image, vgg16_model)
                 elif st.session_state.ecg_sample:
                     st.session_state.ecg_result = simulate_ecg_prediction(is_demo=True)
@@ -993,18 +1120,25 @@ def main():
                 is_normal = ecg["riskLevel"] == "low"
                 conf_pct = int(ecg["confidence"] * 100)
                 
+                result_icon = icon("fa-circle-check", "2rem", "#10B981") if is_normal else icon("fa-triangle-exclamation", "2rem", "#EF4444")
+                
                 st.markdown(f"""
                 <div class="result-card">
                     <h4>Diagnostic Result</h4>
+                    <p style="color:#6B7280;font-size:0.85rem;">CNN VGG16 Morphological Analysis</p>
                     <div style="border-radius:16px;padding:16px;border:1px solid {'#D1FAE5' if is_normal else '#FEE2E2'};
                          background:{'#ECFDF5' if is_normal else '#FEF2F2'};margin:12px 0;">
-                        <span style="font-size:2rem;">{'✅' if is_normal else '⚠️'}</span>
-                        <h4 style="color:#0B1F3A;">{'Normal Sinus Rhythm' if is_normal else 'Anomaly Detected'}</h4>
-                        <p style="color:#6B7280;font-size:0.8rem;">{ecg["classification"]}</p>
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            {result_icon}
+                            <div>
+                                <h4 style="color:#0B1F3A;margin:0;">{'Normal Sinus Rhythm' if is_normal else 'Anomaly Detected'}</h4>
+                                <p style="color:#6B7280;font-size:0.8rem;margin:0;">{ecg["classification"]}</p>
+                            </div>
+                        </div>
                     </div>
                     <div style="background:#F7F9FC;padding:16px;border-radius:12px;border:1px solid #E2E8F0;margin:12px 0;">
-                        <div style="display:flex;justify-content:space-between;">
-                            <span style="font-size:0.7rem;font-weight:700;color:#6B7280;">Model Confidence</span>
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:0.7rem;font-weight:700;color:#6B7280;text-transform:uppercase;">Model Confidence</span>
                             <span style="font-size:1.5rem;font-weight:800;color:#0B1F3A;">{conf_pct}%</span>
                         </div>
                         <div style="height:12px;background:#E2E8F0;border-radius:999px;overflow:hidden;margin-top:8px;">
@@ -1012,7 +1146,8 @@ def main():
                         </div>
                     </div>
                     <div style="background:#F7F9FC;padding:16px;border-radius:12px;border:1px solid #E2E8F0;">
-                        <p style="font-size:0.7rem;font-weight:700;color:#0B1F3A;text-transform:uppercase;">Key Findings</p>
+                        <p style="font-size:0.7rem;font-weight:700;color:#0B1F3A;text-transform:uppercase;">
+                            {icon("fa-magnifying-glass-chart", "", "#2EC4B6")} Key Findings</p>
                         <p style="font-size:0.85rem;color:#4B5563;">{ecg["findings"]}</p>
                     </div>
                 </div>
@@ -1023,13 +1158,14 @@ def main():
                     if fig: st.plotly_chart(fig, use_container_width=True, key="ecg_only_probs")
                 
                 pdf_data = {"mode": "ecg", "ecgResult": ecg}
-                pdf_download_button(pdf_data, "📥 Download ECG Report")
+                pdf_download_button(pdf_data, "Download ECG Report (PDF)")
             else:
-                st.markdown("""
+                empty_icon = icon("fa-heart-pulse", "3rem", "#2EC4B6")
+                st.markdown(f"""
                 <div class="empty-state">
-                    <span style="font-size:3rem;">📈</span>
-                    <h4>Awaiting ECG Input</h4>
-                    <p style="color:#6B7280;">Select a demo sample or upload an ECG image.</p>
+                    {empty_icon}
+                    <h4 style="color:#0B1F3A;margin-top:16px;">Awaiting ECG Input</h4>
+                    <p style="color:#6B7280;">Select a demo sample or upload an ECG image on the left to begin.</p>
                 </div>
                 """, unsafe_allow_html=True)
     
@@ -1039,7 +1175,7 @@ def main():
     
     with tab3:
         st.markdown("#### Data-Only Analysis")
-        st.caption("Random Forest + SMOTE — No ECG required")
+        st.caption("Random Forest + SMOTE evaluation. No ECG required — works anywhere, instantly.")
         
         dc1, dc2 = st.columns([1.2, 1])
         
@@ -1067,15 +1203,16 @@ def main():
             # Quick load buttons
             qc1, qc2 = st.columns(2)
             with qc1:
-                if st.button("Load Low Risk", use_container_width=True, key="data_load_low"):
+                if st.button("Load Low Risk Sample", use_container_width=True, key="data_load_low"):
                     st.session_state.data_preset = "low"
                     st.rerun()
             with qc2:
-                if st.button("Load High Risk", use_container_width=True, key="data_load_high"):
+                if st.button("Load High Risk Sample", use_container_width=True, key="data_load_high"):
                     st.session_state.data_preset = "high"
                     st.rerun()
             
-            if st.button("Analyze Patient Data", type="primary", use_container_width=True, key="data_analyze_btn"):
+            analyze_icon = icon("fa-stethoscope")
+            if st.button(f"{analyze_icon} Analyze Patient Data", type="primary", use_container_width=True, key="data_analyze_btn"):
                 patient_data = {
                     "patientName": patient_name, "age": age, "sex": sex,
                     "chestPainType": chest_pain, "restingBpS": resting_bp,
@@ -1083,7 +1220,7 @@ def main():
                     "restingEcg": resting_ecg, "maxHeartRate": max_hr,
                     "exerciseAngina": 1 if ex_angina else 0, "oldpeak": oldpeak, "stSlope": st_slope
                 }
-                with st.spinner("Analyzing..."):
+                with st.spinner("Analyzing patient data with Random Forest + SMOTE..."):
                     st.session_state.data_rf_result = predict_rf(patient_data, preprocessor, rf_model)
         
         with dc2:
@@ -1091,6 +1228,7 @@ def main():
                 rf = st.session_state.data_rf_result
                 st.markdown("<div class='result-card'>", unsafe_allow_html=True)
                 st.markdown("#### Clinical Assessment")
+                st.caption("Random Forest Feature Evaluation")
                 st.markdown(risk_badge_html(rf["riskLevel"]), unsafe_allow_html=True)
                 st.plotly_chart(render_risk_gauge(rf["riskScore"], rf["riskLevel"]), use_container_width=True, key="data_rf_gauge")
                 if rf.get("features"):
@@ -1098,20 +1236,22 @@ def main():
                     if fig: st.plotly_chart(fig, use_container_width=True, key="data_rf_features")
                 st.markdown(f"""
                 <div style="background:#F7F9FC;padding:16px;border-radius:12px;border:1px solid #E2E8F0;">
-                    <p style="font-size:0.7rem;font-weight:700;color:#0B1F3A;text-transform:uppercase;">Clinical Interpretation</p>
+                    <p style="font-size:0.7rem;font-weight:700;color:#0B1F3A;text-transform:uppercase;">
+                        {icon("fa-circle-info", "", "#2EC4B6")} Clinical Interpretation</p>
                     <p style="font-size:0.85rem;color:#4B5563;">{rf["recommendation"]}</p>
                 </div>
                 """, unsafe_allow_html=True)
                 st.markdown("</div>", unsafe_allow_html=True)
                 
                 pdf_data = {"mode": "data", "rfResult": rf}
-                pdf_download_button(pdf_data)
+                pdf_download_button(pdf_data, "Download Clinical Report (PDF)")
             else:
-                st.markdown("""
+                empty_icon = icon("fa-chart-bar", "3rem", "#2EC4B6")
+                st.markdown(f"""
                 <div class="empty-state">
-                    <span style="font-size:3rem;">📊</span>
-                    <h4>Awaiting Patient Data</h4>
-                    <p style="color:#6B7280;">Fill out patient vitals and click analyze.</p>
+                    {empty_icon}
+                    <h4 style="color:#0B1F3A;margin-top:16px;">Awaiting Patient Data</h4>
+                    <p style="color:#6B7280;">Fill out the patient vitals form and click analyze to generate a cardiovascular risk assessment.</p>
                 </div>
                 """, unsafe_allow_html=True)
     
@@ -1120,19 +1260,27 @@ def main():
     # ========================================================================
     
     with tab4:
-        st.markdown("""
+        st.markdown(f"""
         <div style="text-align:center;margin-bottom:40px;">
             <span style="display:inline-block;padding:4px 16px;border-radius:999px;background:rgba(46,196,182,0.1);
                   border:1px solid rgba(46,196,182,0.3);color:#2EC4B6;font-size:0.7rem;font-weight:700;
-                  text-transform:uppercase;letter-spacing:0.1em;margin-bottom:16px;">Investment Brief · 2026</span>
-            <h1 style="color:#0B1F3A;">Redefining Cardiovascular Care with AI</h1>
-            <p style="color:#6B7280;max-width:700px;margin:0 auto;">Dual-mode screening platform deploying Random Forest + SMOTE and CNN VGG16 for instant triage.</p>
+                  text-transform:uppercase;letter-spacing:0.1em;margin-bottom:16px;">
+                  {icon("fa-chart-pie", "", "#2EC4B6")} Investment Brief &middot; 2026</span>
+            <h1 style="color:#0B1F3A;font-size:2.5rem;font-weight:700;">Redefining Cardiovascular Care with AI</h1>
+            <p style="color:#6B7280;font-size:1.1rem;max-width:700px;margin:0 auto;">
+                A dual-mode cardiovascular screening platform deploying Random Forest with SMOTE and CNN VGG16 
+                for instant triage in resource-constrained clinical environments.
+            </p>
         </div>
         """, unsafe_allow_html=True)
         
         cols = st.columns(4)
-        stats = [("91%", "RF+SMOTE Accuracy", "1,200 records"), ("2,500+", "ECG Images", "CNN VGG16"),
-                 ("< 2s", "Inference Time", "Per prediction"), ("$4B+", "Addressable Market", "Global CDS")]
+        stats = [
+            ("91%", "RF+SMOTE Accuracy", "1,200 patient records"),
+            ("2,500+", "ECG Images", "CNN VGG16 Trained"),
+            ("< 2s", "Inference Time", "Per prediction"),
+            ("$4B+", "Addressable Market", "Global CDS software")
+        ]
         for col, (v, l, s) in zip(cols, stats):
             with col:
                 st.markdown(f"""
@@ -1147,77 +1295,151 @@ def main():
         ac1, ac2 = st.columns(2)
         
         with ac1:
-            st.markdown("""
-            <div style="background:white;border-radius:16px;border-top:4px solid #EF4444;padding:24px;">
-                <h3>⚠️ The Clinical Bottleneck</h3>
-                <p style="color:#4B5563;">Primary care and rural clinics cannot rely on ECG for every screening. This delays triage and limits scalability.</p>
+            st.markdown(f"""
+            <div class="investor-card investor-card-red">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+                    <div class="icon-circle icon-circle-red">
+                        {icon("fa-triangle-exclamation", "", "#EF4444")}
+                    </div>
+                    <h3 style="color:#1F2937;margin:0;">The Clinical Bottleneck</h3>
+                </div>
+                <p style="color:#4B5563;">Primary care and rural clinics cannot rely on ECG for every screening. A standard ECG requires equipment, trained technicians, and cardiologists to interpret.</p>
+                <p style="color:#4B5563;margin-top:12px;">This delays triage, limits scalability, and forces high-risk patients to wait for specialist availability — leading to worse outcomes and higher systemic costs.</p>
                 <div style="background:#FEF2F2;padding:12px;border-radius:8px;margin-top:16px;border:1px solid #FEE2E2;">
-                    <p style="color:#991B1B;font-size:0.8rem;">⚠️ CVD accounts for 32% of all global deaths — early triage saves lives.</p>
+                    <p style="color:#991B1B;font-size:0.8rem;font-weight:500;">
+                        {icon("fa-triangle-exclamation", "", "#EF4444")} Cardiovascular disease accounts for 32% of all global deaths — early triage directly saves lives.
+                    </p>
                 </div>
             </div>
             """, unsafe_allow_html=True)
         
         with ac2:
-            st.markdown("""
-            <div style="background:white;border-radius:16px;border-top:4px solid #2EC4B6;padding:24px;">
-                <h3>📊 Dual-Mode AI Architecture</h3>
-                <p style="color:#4B5563;font-weight:600;">Works with or without ECG.</p>
-                <p><strong>Phase 1:</strong> RF + SMOTE on 11 features (91% accuracy). No ECG required.</p>
-                <p><strong>Phase 2:</strong> CNN VGG16 on 2,500 ECG images (4 classes).</p>
+            st.markdown(f"""
+            <div class="investor-card investor-card-teal">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+                    <div class="icon-circle icon-circle-teal">
+                        {icon("fa-diagram-project", "", "#2EC4B6")}
+                    </div>
+                    <h3 style="color:#1F2937;margin:0;">Dual-Mode AI Architecture</h3>
+                </div>
+                <p style="color:#4B5563;font-weight:600;">Works dynamically with or without ECG availability.</p>
+                <div style="margin-top:16px;">
+                    <div style="display:flex;gap:12px;margin-bottom:16px;">
+                        <div style="width:24px;height:24px;background:#0B1F3A;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;flex-shrink:0;">1</div>
+                        <div>
+                            <p style="font-weight:700;color:#1F2937;font-size:0.8rem;text-transform:uppercase;">Phase 1 — Structured Vitals</p>
+                            <p style="color:#6B7280;font-size:0.8rem;">Random Forest + SMOTE on 11 clinical features. No ECG required. 91% accuracy on 1,200 records. Deployable in any clinic globally.</p>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:12px;">
+                        <div style="width:24px;height:24px;background:#2EC4B6;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;flex-shrink:0;">2</div>
+                        <div>
+                            <p style="font-weight:700;color:#1F2937;font-size:0.8rem;text-transform:uppercase;">Phase 2 — ECG Validation</p>
+                            <p style="color:#6B7280;font-size:0.8rem;">CNN VGG16 on 2,500 ECG images across 4 classes. Deep learning morphological analysis for definitive classification when equipment is present.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
             """, unsafe_allow_html=True)
         
         st.markdown("---")
-        st.markdown("""
-        <div style="background:linear-gradient(135deg, #0B1F3A, #122b4d);border-radius:24px;padding:48px;text-align:center;color:white;">
-            <h2 style="color:white;">Deploy CardioShield AI at your facility</h2>
-            <p style="color:rgba(255,255,255,0.7);">Join leading clinics getting early access.</p>
+        
+        # Value Propositions
+        st.markdown(f"""
+        <div style="text-align:center;margin-bottom:32px;">
+            <p style="color:#2EC4B6;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;">Why CardioShield</p>
+            <h2 style="color:#0B1F3A;">Platform Value Proposition</h2>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        vp_cols = st.columns(4)
+        vps = [
+            ("fa-circle-check", "Works Without ECG", "Democratizes screening to any clinic capable of taking basic vitals and history."),
+            ("fa-chart-simple", "ECG Validation Layer", "Seamlessly integrates deep learning morphological analysis when equipment is available."),
+            ("fa-bolt", "Low-Cost Architecture", "Optimized inference pipelines minimize compute costs per prediction — scalable from day one."),
+            ("fa-arrow-trend-up", "Fast Pilotability", "No hardware required to launch. Software-only integration accelerates B2B sales cycles.")
+        ]
+        for col, (icn, title, desc) in zip(vp_cols, vps):
+            with col:
+                st.markdown(f"""
+                <div style="text-align:center;padding:24px;">
+                    <div style="width:56px;height:56px;background:#F7F9FC;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+                        {icon(icn, "1.5rem", "#2EC4B6")}
+                    </div>
+                    <p style="font-weight:700;color:#0B1F3A;margin-bottom:8px;">{title}</p>
+                    <p style="font-size:0.8rem;color:#6B7280;">{desc}</p>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Waitlist CTA
+        st.markdown("---")
+        st.markdown(f"""
+        <div style="background:linear-gradient(135deg, #0B1F3A 0%, #122b4d 100%);border-radius:24px;padding:48px;text-align:center;color:white;position:relative;overflow:hidden;">
+            <div style="position:absolute;top:-50px;right:-50px;width:200px;height:200px;background:rgba(46,196,182,0.2);border-radius:50%;filter:blur(40px);"></div>
+            <div style="position:relative;z-index:1;">
+                <h2 style="color:white;font-size:2rem;font-weight:700;margin-bottom:12px;">Deploy CardioShield AI at your facility</h2>
+                <p style="color:rgba(255,255,255,0.7);font-size:1.1rem;margin-bottom:32px;">
+                    Join leading clinics getting early access to our combined RF + CNN screening architecture.
+                </p>
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
         with st.form("investor_waitlist"):
             wc1, wc2 = st.columns([3, 1])
             with wc1:
-                wl_name = st.text_input("Full Name", key="investor_name")
-                wl_email = st.text_input("Work Email", key="investor_email")
+                wl_name = st.text_input("Full Name", placeholder="Dr. Jane Smith", key="investor_name")
+                wl_email = st.text_input("Work Email", placeholder="you@hospital.org", key="investor_email")
             with wc2:
                 st.markdown("<br>", unsafe_allow_html=True)
-                if st.form_submit_button("Get Early Access →", type="primary", use_container_width=True):
+                submit_icon = icon("fa-paper-plane")
+                if st.form_submit_button(f"{submit_icon} Get Early Access", type="primary", use_container_width=True):
                     if wl_name and wl_email:
                         pos = add_to_waitlist(wl_name, wl_email)
-                        if pos: st.success(f"✅ You're #{pos} on the waitlist!")
-                        else: st.warning("Already registered.")
+                        if pos: st.success(f"You're #{pos} on the waitlist! We'll be in touch soon.")
+                        else: st.warning("This email is already registered on the waitlist.")
                     else:
-                        st.error("Fill all fields.")
+                        st.error("Please fill in all fields to join the waitlist.")
+    
+    # ========================================================================
+    # DISCLAIMER
+    # ========================================================================
+    
+    with st.expander(f"{icon('fa-circle-info', '', '#2EC4B6')} Responsible AI & Clinical Use Disclaimer"):
+        st.markdown("""
+        CardioShield AI is a clinical decision support tool designed to assist healthcare professionals in evaluating cardiovascular risk. 
+        It is **not a substitute** for professional medical diagnosis, advice, or treatment.
+        
+        The tabular model uses Random Forest with SMOTE trained on the Heart Statlog Cleveland Hungary Final dataset (1,200 patient records, 11 features). 
+        The ECG classifier uses a VGG16 architecture trained on 2,500 ECG images. Both models provide statistical probabilities — clinicians must apply 
+        professional judgment and full clinical context.
+        """)
     
     # ========================================================================
     # FOOTER
     # ========================================================================
     
-    with st.expander("ℹ️ Responsible AI & Clinical Use Disclaimer"):
-        st.markdown("""
-        CardioShield AI is a clinical decision support tool only. **Not a substitute** for professional medical diagnosis.
-        RF+SMOTE trained on Heart Statlog Cleveland Hungary dataset (1,200 records, 11 features).
-        VGG16 trained on 2,500 ECG images. Clinicians must apply professional judgment.
-        """)
-    
     st.markdown("---")
-    st.markdown("""
+    st.markdown(f"""
     <div style="text-align:center;padding:20px;">
         <p style="color:#9CA3AF;font-size:0.75rem;">
-            CardioShield AI — Clinical decision support only · RF+SMOTE: 1,200 records · VGG16: 2,500 ECG images
+            CardioShield AI — Clinical decision support only &nbsp;&middot;&nbsp; RF+SMOTE: 1,200 records &nbsp;&middot;&nbsp; VGG16: 2,500 ECG images
         </p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Sidebar waitlist
+    # ========================================================================
+    # SIDEBAR WAITLIST
+    # ========================================================================
+    
     with st.sidebar:
-        st.markdown("### 📋 Join Waitlist")
-        st.metric("Total Signups", get_waitlist_count())
+        st.markdown(f"### {icon('fa-envelope', '', '#2EC4B6')} Join Waitlist")
+        waitlist_count = get_waitlist_count()
+        st.metric("Total Signups", waitlist_count)
         with st.form("sidebar_waitlist"):
-            sn = st.text_input("Name", key="sidebar_wl_name")
-            se = st.text_input("Email", key="sidebar_wl_email")
-            if st.form_submit_button("Join", type="primary", use_container_width=True):
+            sn = st.text_input("Full Name", key="sidebar_wl_name")
+            se = st.text_input("Work Email", key="sidebar_wl_email")
+            if st.form_submit_button(f"{icon('fa-paper-plane')} Join", type="primary", use_container_width=True):
                 if sn and se:
                     p = add_to_waitlist(sn, se)
                     if p: st.success(f"Position #{p}!")
