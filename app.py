@@ -193,7 +193,6 @@ def inject_custom_css():
             box-shadow: 0 4px 16px rgba(11, 31, 58, 0.3);
         }
         
-        /* Investor page card styling */
         .investor-card {
             background: white;
             border-radius: 16px;
@@ -226,7 +225,6 @@ def inject_custom_css():
             background: #D1FAE5;
         }
         
-        /* Streamlit tab styling overrides */
         .stTabs [data-baseweb="tab-list"] {
             gap: 0.5rem;
             background: white;
@@ -246,6 +244,14 @@ def inject_custom_css():
             background: #0B1F3A;
             color: white;
         }
+        
+        .sidebar-metric {
+            background: #F7F9FC;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            margin-bottom: 16px;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -259,10 +265,6 @@ def icon(name, size="", color="", cls=""):
     color_style = f"color:{color};" if color else ""
     style = f'style="{size_style}{color_style}"' if (size_style or color_style) else ""
     return f'<i class="fa-solid {name} {cls}" {style}></i>'
-
-def icon_fw(name, size="", color=""):
-    """Fixed-width icon"""
-    return icon(name, size, color, "fa-fw")
 
 # ============================================================================
 # MODEL MANAGEMENT
@@ -852,21 +854,14 @@ def main():
     """, unsafe_allow_html=True)
     
     # ========================================================================
-    # TABS
+    # TABS (no HTML in labels)
     # ========================================================================
     
-    tab_icons = {
-        "dual": icon("fa-microscope"),
-        "ecg": icon("fa-heart-pulse"),
-        "data": icon("fa-table"),
-        "investor": icon("fa-briefcase")
-    }
-    
     tab1, tab2, tab3, tab4 = st.tabs([
-        f"{tab_icons['dual']} Dual Mode",
-        f"{tab_icons['ecg']} ECG-Only",
-        f"{tab_icons['data']} Data-Only",
-        f"{tab_icons['investor']} Investor Brief"
+        "Dual Mode",
+        "ECG-Only",
+        "Data-Only",
+        "Investor Brief"
     ])
     
     # ========================================================================
@@ -908,8 +903,7 @@ def main():
                 fbs = st.toggle("Fasting Blood Sugar >120", key="dual_fbs")
                 ex_angina = st.toggle("Exercise Induced Angina", key="dual_ex_angina")
             
-            analyze_icon = icon("fa-stethoscope")
-            if st.button(f"{analyze_icon} Analyze Patient Data", type="primary", use_container_width=True, key="dual_analyze_btn"):
+            if st.button("Analyze Patient Data", type="primary", use_container_width=True, key="dual_analyze_btn"):
                 patient_data = {
                     "patientName": patient_name, "age": age, "sex": sex,
                     "chestPainType": chest_pain, "restingBpS": resting_bp,
@@ -955,7 +949,7 @@ def main():
                 st.image(uploaded_file, caption="Uploaded ECG", width='stretch')
             
             if not st.session_state.ecg_sample and not st.session_state.ecg_image:
-                st.info(f"{icon('fa-circle-info', '', '#2EC4B6')} No ECG selected — RF + SMOTE will still run on patient vitals. Select a sample or upload an ECG to enable dual-model triage.")
+                st.info("No ECG selected — RF + SMOTE will still run on patient vitals. Select a sample or upload an ECG to enable dual-model triage.")
         
         # Results
         if st.session_state.dual_result:
@@ -964,7 +958,7 @@ def main():
             dual = st.session_state.dual_result
             
             if not dual.get("ecgProvided"):
-                st.warning(f"{icon('fa-triangle-exclamation')} ECG was not provided — results show Random Forest analysis only. Add an ECG input for dual-model combined triage.")
+                st.warning("ECG was not provided — results show Random Forest analysis only. Add an ECG input for dual-model combined triage.")
             
             rc1, rc2 = st.columns([1, 1] if dual.get("ecgProvided") else [1])
             
@@ -1106,8 +1100,7 @@ def main():
             
             has_ecg = bool(st.session_state.ecg_sample or st.session_state.ecg_image)
             
-            scan_icon = icon("fa-magnifying-glass")
-            if st.button(f"{scan_icon} Analyze ECG", type="primary", use_container_width=True, disabled=not has_ecg, key="ecg_only_analyze"):
+            if st.button("Analyze ECG", type="primary", use_container_width=True, disabled=not has_ecg, key="ecg_only_analyze"):
                 if st.session_state.ecg_image:
                     with st.spinner("Processing ECG image with CNN VGG16..."):
                         st.session_state.ecg_result = predict_ecg(st.session_state.ecg_image, vgg16_model)
@@ -1211,8 +1204,7 @@ def main():
                     st.session_state.data_preset = "high"
                     st.rerun()
             
-            analyze_icon = icon("fa-stethoscope")
-            if st.button(f"{analyze_icon} Analyze Patient Data", type="primary", use_container_width=True, key="data_analyze_btn"):
+            if st.button("Analyze Patient Data", type="primary", use_container_width=True, key="data_analyze_btn"):
                 patient_data = {
                     "patientName": patient_name, "age": age, "sex": sex,
                     "chestPainType": chest_pain, "restingBpS": resting_bp,
@@ -1392,8 +1384,7 @@ def main():
                 wl_email = st.text_input("Work Email", placeholder="you@hospital.org", key="investor_email")
             with wc2:
                 st.markdown("<br>", unsafe_allow_html=True)
-                submit_icon = icon("fa-paper-plane")
-                if st.form_submit_button(f"{submit_icon} Get Early Access", type="primary", use_container_width=True):
+                if st.form_submit_button("Get Early Access", type="primary", use_container_width=True):
                     if wl_name and wl_email:
                         pos = add_to_waitlist(wl_name, wl_email)
                         if pos: st.success(f"You're #{pos} on the waitlist! We'll be in touch soon.")
@@ -1405,7 +1396,7 @@ def main():
     # DISCLAIMER
     # ========================================================================
     
-    with st.expander(f"{icon('fa-circle-info', '', '#2EC4B6')} Responsible AI & Clinical Use Disclaimer"):
+    with st.expander("Responsible AI & Clinical Use Disclaimer"):
         st.markdown("""
         CardioShield AI is a clinical decision support tool designed to assist healthcare professionals in evaluating cardiovascular risk. 
         It is **not a substitute** for professional medical diagnosis, advice, or treatment.
@@ -1433,16 +1424,23 @@ def main():
     # ========================================================================
     
     with st.sidebar:
-        st.markdown(f"### {icon('fa-envelope', '', '#2EC4B6')} Join Waitlist")
+        st.markdown("### Join Waitlist")
         waitlist_count = get_waitlist_count()
-        st.metric("Total Signups", waitlist_count)
+        
+        st.markdown(f"""
+        <div class="sidebar-metric">
+            <span style="font-size:2rem;font-weight:800;color:#0B1F3A;">{waitlist_count}</span>
+            <p style="color:#6B7280;font-size:0.8rem;margin:0;">Total Signups</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
         with st.form("sidebar_waitlist"):
             sn = st.text_input("Full Name", key="sidebar_wl_name")
             se = st.text_input("Work Email", key="sidebar_wl_email")
-            if st.form_submit_button(f"{icon('fa-paper-plane')} Join", type="primary", use_container_width=True):
+            if st.form_submit_button("Join Waitlist", type="primary", use_container_width=True):
                 if sn and se:
                     p = add_to_waitlist(sn, se)
-                    if p: st.success(f"Position #{p}!")
+                    if p: st.success(f"You're #{p} on the list!")
                     else: st.warning("Already registered.")
 
 if __name__ == "__main__":
