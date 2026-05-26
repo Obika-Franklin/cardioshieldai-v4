@@ -32,7 +32,6 @@ st.set_page_config(
 # ============================================================================
 
 def inject_custom_css():
-    # Load Font Awesome
     st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">', unsafe_allow_html=True)
     
     st.markdown("""
@@ -771,10 +770,8 @@ def pdf_download_button(pdf_data, label="Download Clinical Report"):
 def main():
     inject_custom_css()
     
-    # Load models
     preprocessor, rf_model, vgg16_model = load_models()
     
-    # Initialize session state
     defaults = {
         'ecg_sample': None,
         'ecg_image': None,
@@ -854,7 +851,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # ========================================================================
-    # TABS (no HTML in labels)
+    # TABS
     # ========================================================================
     
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -903,7 +900,7 @@ def main():
                 fbs = st.toggle("Fasting Blood Sugar >120", key="dual_fbs")
                 ex_angina = st.toggle("Exercise Induced Angina", key="dual_ex_angina")
             
-            if st.button("Analyze Patient Data", type="primary", use_container_width=True, key="dual_analyze_btn"):
+            if st.button("Analyze Patient Data", type="primary", width="stretch", key="dual_analyze_btn"):
                 patient_data = {
                     "patientName": patient_name, "age": age, "sex": sex,
                     "chestPainType": chest_pain, "restingBpS": resting_bp,
@@ -960,7 +957,13 @@ def main():
             if not dual.get("ecgProvided"):
                 st.warning("ECG was not provided — results show Random Forest analysis only. Add an ECG input for dual-model combined triage.")
             
-            rc1, rc2 = st.columns([1, 1] if dual.get("ecgProvided") else [1])
+            # FIXED: Handle single column case properly
+            has_ecg = dual.get("ecgProvided", False)
+            if has_ecg:
+                rc1, rc2 = st.columns([1, 1])
+            else:
+                rc1 = st.columns([1])[0]
+                rc2 = None
             
             with rc1:
                 st.markdown("<div class='result-card'>", unsafe_allow_html=True)
@@ -982,7 +985,7 @@ def main():
                 """, unsafe_allow_html=True)
                 st.markdown("</div>", unsafe_allow_html=True)
             
-            if dual.get("ecgProvided") and dual.get("ecgResult"):
+            if has_ecg and dual.get("ecgResult") and rc2 is not None:
                 with rc2:
                     st.markdown("<div class='result-card'>", unsafe_allow_html=True)
                     st.markdown("#### CNN VGG16 ECG")
@@ -1100,7 +1103,7 @@ def main():
             
             has_ecg = bool(st.session_state.ecg_sample or st.session_state.ecg_image)
             
-            if st.button("Analyze ECG", type="primary", use_container_width=True, disabled=not has_ecg, key="ecg_only_analyze"):
+            if st.button("Analyze ECG", type="primary", width="stretch", disabled=not has_ecg, key="ecg_only_analyze"):
                 if st.session_state.ecg_image:
                     with st.spinner("Processing ECG image with CNN VGG16..."):
                         st.session_state.ecg_result = predict_ecg(st.session_state.ecg_image, vgg16_model)
@@ -1193,18 +1196,17 @@ def main():
                 fbs = st.toggle("Fasting Blood Sugar >120", key="data_fbs")
                 ex_angina = st.toggle("Exercise Induced Angina", key="data_ex_angina")
             
-            # Quick load buttons
             qc1, qc2 = st.columns(2)
             with qc1:
-                if st.button("Load Low Risk Sample", use_container_width=True, key="data_load_low"):
+                if st.button("Load Low Risk Sample", width="stretch", key="data_load_low"):
                     st.session_state.data_preset = "low"
                     st.rerun()
             with qc2:
-                if st.button("Load High Risk Sample", use_container_width=True, key="data_load_high"):
+                if st.button("Load High Risk Sample", width="stretch", key="data_load_high"):
                     st.session_state.data_preset = "high"
                     st.rerun()
             
-            if st.button("Analyze Patient Data", type="primary", use_container_width=True, key="data_analyze_btn"):
+            if st.button("Analyze Patient Data", type="primary", width="stretch", key="data_analyze_btn"):
                 patient_data = {
                     "patientName": patient_name, "age": age, "sex": sex,
                     "chestPainType": chest_pain, "restingBpS": resting_bp,
@@ -1336,7 +1338,6 @@ def main():
         
         st.markdown("---")
         
-        # Value Propositions
         st.markdown(f"""
         <div style="text-align:center;margin-bottom:32px;">
             <p style="color:#2EC4B6;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;">Why CardioShield</p>
@@ -1363,7 +1364,6 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
         
-        # Waitlist CTA
         st.markdown("---")
         st.markdown(f"""
         <div style="background:linear-gradient(135deg, #0B1F3A 0%, #122b4d 100%);border-radius:24px;padding:48px;text-align:center;color:white;position:relative;overflow:hidden;">
@@ -1384,7 +1384,7 @@ def main():
                 wl_email = st.text_input("Work Email", placeholder="you@hospital.org", key="investor_email")
             with wc2:
                 st.markdown("<br>", unsafe_allow_html=True)
-                if st.form_submit_button("Get Early Access", type="primary", use_container_width=True):
+                if st.form_submit_button("Get Early Access", type="primary", width="stretch"):
                     if wl_name and wl_email:
                         pos = add_to_waitlist(wl_name, wl_email)
                         if pos: st.success(f"You're #{pos} on the waitlist! We'll be in touch soon.")
@@ -1437,7 +1437,7 @@ def main():
         with st.form("sidebar_waitlist"):
             sn = st.text_input("Full Name", key="sidebar_wl_name")
             se = st.text_input("Work Email", key="sidebar_wl_email")
-            if st.form_submit_button("Join Waitlist", type="primary", use_container_width=True):
+            if st.form_submit_button("Join Waitlist", type="primary", width="stretch"):
                 if sn and se:
                     p = add_to_waitlist(sn, se)
                     if p: st.success(f"You're #{p} on the list!")
