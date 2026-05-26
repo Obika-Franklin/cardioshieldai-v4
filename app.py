@@ -121,18 +121,14 @@ models = load_production_models()
 # ==========================================
 # 3. HELPER UI COMPONENTS
 # ==========================================
-def render_patient_form(key_prefix="main"):
-    """Renders the patient form with unique keys for every tab."""
+def render_patient_form():
+    """Renders the exact 11-feature form from DataMode.tsx"""
     st.markdown("#### Patient Vitals")
     colA, colB = st.columns(2)
-    
-    # Add key_prefix to distinguish buttons in different tabs
     with colA:
-        if st.button("Load Low Risk Sample", key=f"{key_prefix}_low", use_container_width=True): 
-            load_demo_data("low")
+        if st.button("Load Low Risk Sample", use_container_width=True): load_demo_data("low")
     with colB:
-        if st.button("Load High Risk Sample", key=f"{key_prefix}_high", use_container_width=True): 
-            load_demo_data("high")
+        if st.button("Load High Risk Sample", use_container_width=True): load_demo_data("high")
 
     st.markdown("---")
     fd = st.session_state.form_data
@@ -224,7 +220,7 @@ with tab_dual:
     
     with col_form:
         with st.container(border=True):
-            current_vitals = render_patient_form(key_prefix='dual')
+            current_vitals = render_patient_form()
             
     with col_ecg:
         with st.container(border=True):
@@ -300,7 +296,7 @@ with tab_data:
     st.caption("Random Forest + SMOTE Clinical Risk Assessment")
     
     with st.container(border=True):
-        data_vitals = render_patient_form(key_prefix='data')
+        data_vitals = render_patient_form()
         
         if st.button("Run Tabular Prediction", type="primary"):
             st.markdown("---")
