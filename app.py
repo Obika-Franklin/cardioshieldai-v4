@@ -263,58 +263,17 @@ with tab_dual:
                         st.write("Awaiting ECG input...")
 
 # ==========================================
-# --- TAB 2: ECG ONLY ---
+# TAB 2 & 3: ECG ONLY / DATA ONLY
+# ==========================================
 with tab_ecg:
-    st.markdown("### 🫀 ECG-Only Inference Engine")
-    st.caption("Standalone VGG16 Convolutional Neural Network Analysis")
-    
-    with st.container(border=True):
-        ecg_file = st.file_uploader("Upload ECG Graphic Strip", type=["png", "jpg"], key="ecg_only_uploader")
-        
-        # Add sample selector for ECG
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("Load Normal Demo", use_container_width=True): st.session_state.active_ecg_sample = "normal"
-        with c2:
-            if st.button("Load MI Demo", use_container_width=True): st.session_state.active_ecg_sample = "mi"
-            
-        if ecg_file or st.session_state.active_ecg_sample:
-            st.image(ecg_file if ecg_file else "https://via.placeholder.com/400x100?text=ECG+Waveform+Sample", caption="Active Signal Input")
-            
-            if st.button("Run Image Inference", type="primary"):
-                # Simulation of VGG16 prediction logic
-                st.markdown("---")
-                if st.session_state.active_ecg_sample == "mi":
-                    st.error("🚨 CRITICAL: Myocardial Infarction Signatures Detected")
-                else:
-                    st.success("✅ Normal Sinus Rhythm Confirmed")
-                st.metric("Model Confidence", "98.2%")
+    st.markdown("### ECG-Only Mode")
+    st.write("CNN VGG16 Deep Learning classification for standalone ECG images.")
+    # Mirrors the right column of Dual Mode
 
-# --- TAB 3: DATA ONLY ---
 with tab_data:
-    st.markdown("### 📊 Tabular Data-Only Diagnostic")
-    st.caption("Random Forest + SMOTE Clinical Risk Assessment")
-    
-    with st.container(border=True):
-        data_vitals = render_patient_form()
-        
-        if st.button("Run Tabular Prediction", type="primary"):
-            st.markdown("---")
-            # Logic: Using the model or fallback if file is missing
-            st.subheader("Risk Assessment")
-            
-            # Simple simulation logic matching your requirements
-            risk_score = 15.5 if data_vitals['max_hr'] > 140 else 72.8
-            
-            col_g, col_desc = st.columns([1, 2])
-            with col_g:
-                st.plotly_chart(draw_risk_gauge(risk_score), use_container_width=True)
-            with col_desc:
-                if risk_score < 35:
-                    st.success("Stable health profile detected.")
-                else:
-                    st.error("Elevated cardiovascular risk factors. Consultation recommended.")
-                st.write(f"Confidence Level: **{100 - (risk_score * 0.1):.1f}%**")
+    st.markdown("### Data-Only Mode")
+    st.write("Random Forest + SMOTE evaluation. Works anywhere, instantly.")
+    # Mirrors the left column of Dual Mode
 
 # ==========================================
 # TAB 4: INVESTOR BRIEF & WAITLIST
