@@ -396,9 +396,9 @@ def fetch_demo_ecg(sample_type):
 # ============================================================================
 
 @st.cache_resource
-def get_aggregated_feature_importance(_rf_model, preprocessor):
+def get_aggregated_feature_importance(_rf_model, _preprocessor):
     """Aggregate feature importance from post-OHE features back to original clinical features"""
-    if _rf_model is None or preprocessor is None:
+    if _rf_model is None or _preprocessor is None:
         return None
     
     try:
@@ -413,7 +413,7 @@ def get_aggregated_feature_importance(_rf_model, preprocessor):
             return {name: float(imp) for name, imp in zip(feature_names, raw_importances)}
         
         elif n_features > 11:
-            ohe_names = preprocessor.get_feature_names_out()
+            ohe_names = _preprocessor.get_feature_names_out()
             feature_groups = {name: [name] for name in feature_names}
             
             aggregated = {}
