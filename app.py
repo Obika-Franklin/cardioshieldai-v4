@@ -402,12 +402,10 @@ def get_aggregated_feature_importance(_rf_model, _preprocessor):
         return None
     
     raw_importances = _rf_model.feature_importances_
+    ohe_names = list(_preprocessor.get_feature_names_out())
     
-    # Build mapping from OHE column names to original features
-    ohe_names = _preprocessor.get_feature_names_out()
-    
-    # Define which OHE columns map to which original features
-    feature_groups = {
+    # Exact mapping matching your preprocessor output
+    feature_map = {
         'age': ['age'],
         'resting bp s': ['resting bp s'],
         'cholesterol': ['cholesterol'],
@@ -421,17 +419,17 @@ def get_aggregated_feature_importance(_rf_model, _preprocessor):
         'ST slope': ['ST slope_0', 'ST slope_1', 'ST slope_2', 'ST slope_3'],
     }
     
-    # Aggregate importances
     aggregated = {}
-    for orig_name, ohe_variants in feature_groups.items():
+    for orig_name, ohe_variants in feature_map.items():
         total_imp = 0.0
         for ohe_variant in ohe_variants:
             if ohe_variant in ohe_names:
-                idx = list(ohe_names).index(ohe_variant)
+                idx = ohe_names.index(ohe_variant)
                 total_imp += float(raw_importances[idx])
-        aggregated[orig_name] = total_imp
+        if total_imp > 0:
+            aggregated[orig_name] = total_imp
     
-    return aggregated if any(v > 0 for v in aggregated.values()) else None
+    return aggregated if aggregated else None
 
 # ============================================================================
 # DATABASE
@@ -501,7 +499,6 @@ def predict_rf(patient_data, preprocessor, rf_model):
         recommendation = "Low cardiovascular risk profile. Continue routine preventive care. Maintain healthy lifestyle and schedule annual check-up."
     
     agg_importance = get_aggregated_feature_importance(rf_model, preprocessor)
-    st.write("DEBUG - agg_importance:", agg_importance)
     features = []
     if agg_importance:
         features = [{"name": k, "importance": v} for k, v in agg_importance.items()]
