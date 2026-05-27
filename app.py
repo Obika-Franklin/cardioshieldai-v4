@@ -710,99 +710,284 @@ def risk_badge_html(level):
 # PDF GENERATION
 # ============================================================================
 
-def generate_pdf_html(data):
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.colors import HexColor, white, black
+from reportlab.lib.units import mm, cm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.platypus.flowables import HRFlowable
+import tempfile
+
+def generate_pdf_bytes(data):
+    """Generate a real PDF report and return as bytes"""
+    buffer = BytesIO()
+    
+    # Document setup
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=20*mm,
+        leftMargin=20*mm,
+        topMargin=20*mm,
+        bottomMargin=20*mm
+    )
+    
+    # Styles
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Title'],
+        fontSize=22,
+        textColor=HexColor('#001F3F'),
+        spaceAfter=2*mm,
+        fontName='Helvetica-Bold'
+    )
+    
+    subtitle_style = ParagraphStyle(
+        'CustomSubtitle',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=HexColor('#1A9E91'),
+        fontName='Helvetica-Bold',
+        spaceAfter=10*mm,
+        letterSpacing=1
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=13,
+        textColor=HexColor('#001F3F'),
+        fontName='Helvetica-Bold',
+        spaceBefore=8*mm,
+        spaceAfter=4*mm,
+        textTransform='uppercase'
+    )
+    
+    body_style = ParagraphStyle(
+        'CustomBody',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=HexColor('#424242'),
+        fontName='Helvetica',
+        leading=16,
+        spaceAfter=4*mm
+    )
+    
+    badge_style = ParagraphStyle(
+        'Badge',
+        parent=styles['Normal'],
+        fontSize=9,
+        textColor=white,
+        fontName='Helvetica-Bold',
+        leading=14
+    )
+    
+    disclaimer_style = ParagraphStyle(
+        'Disclaimer',
+        parent=styles['Normal'],
+        fontSize=8,
+        textColor=HexColor('#5D4037'),
+        fontName='Helvetica',
+        leading=12,
+        backColor=HexColor('#FFF3E0'),
+        borderPadding=10,
+        borderWidth=0,
+        borderColor=HexColor('#B45309'),
+        borderLeftWidth=4,
+        spaceBefore=10*mm
+    )
+    
+    footer_style = ParagraphStyle(
+        'Footer',
+        parent=styles['Normal'],
+        fontSize=7,
+        textColor=HexColor('#9E9E9E'),
+        fontName='Helvetica',
+        alignment=TA_CENTER
+    )
+    
+    # Risk colors
+    risk_colors = {
+        "high": HexColor('#DC2626'),
+        "moderate": HexColor('#B45309'),
+        "low": HexColor('#059669')
+    }
+    
+    risk_labels = {
+        "high": "HIGH RISK",
+        "moderate": "MODERATE RISK",
+        "low": "LOW RISK"
+    }
+    
+    mode_labels = {
+        "dual": "Dual Mode (RF + VGG16)",
+        "ecg": "ECG-Only Mode (VGG16)",
+        "data": "Data-Only Mode (RF + SMOTE)"
+    }
+    
     now = datetime.now()
     date_str = now.strftime("%B %d, %Y, %I:%M %p")
+    report_id = f"CSR-{now.strftime('%Y%m%d%H%M%S')}"
     
-    mode_labels = {"dual": "Dual Mode (RF + VGG16)", "ecg": "ECG-Only Mode (VGG16)", "data": "Data-Only Mode (RF + SMOTE)"}
+    # Build story
+    story = []
     
-    def risk_color(level):
-        return {"high": "#DC2626", "moderate": "#B45309"}.get(level, "#059669")
+    # Header
+    story.append(Paragraph("CardioShield AI", title_style))
+    story.append(Paragraph("CLINICAL DECISION SUPPORT REPORT", subtitle_style))
+    story.append(HRFlowable(width="100%", thickness=2, color=HexColor('#001F3F')))
+    story.append(Spacer(1, 6*mm))
     
-    def risk_label(level):
-        return {"high": "HIGH RISK", "moderate": "MODERATE RISK"}.get(level, "LOW RISK")
+    # Meta info
+    meta_table = Table([
+        [Paragraph(f"<b>Generated:</b> {date_str}", styles['Normal']),
+         Paragraph(f"<b>Report ID:</b> {report_id}", ParagraphStyle('RightAlign', parent=styles['Normal'], alignment=TA_RIGHT))]
+    ], colWidths=[80*mm, 80*mm])
+    meta_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('TEXTCOLOR', (0, 0), (-1, -1), HexColor('#757575')),
+    ]))
+    story.append(meta_table)
+    story.append(Spacer(1, 8*mm))
     
-    rf_section = ""
+    # Mode badge
+    mode = mode_labels.get(data.get("mode", "data"), "")
+    mode_table = Table([[Paragraph(mode, badge_style)]], colWidths=[60*mm])
+    mode_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), HexColor('#001F3F')),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ROUNDEDCORNERS', [3, 3, 3, 3]),
+    ]))
+    story.append(mode_table)
+    story.append(Spacer(1, 8*mm))
+    
+    # RF Section
     if data.get("rfResult"):
         rf = data["rfResult"]
-        rf_section = f'''
-        <div class="section">
-            <div class="section-title">Random Forest + SMOTE Analysis</div>
-            <div class="model-badge">RF + SMOTE &bull; Accuracy: {rf.get("modelAccuracy", 0.92) * 100:.2f}%</div>
-            <div class="risk-badge" style="background:{risk_color(rf["riskLevel"])}">
-                {risk_label(rf["riskLevel"])} &mdash; Score: {rf["riskScore"]:.1f}/100
-            </div>
-            <div class="findings">{rf["recommendation"]}</div>
-        </div>'''
+        story.append(Paragraph("Random Forest + SMOTE Analysis", heading_style))
+        
+        acc_text = f"RF + SMOTE • Accuracy: {rf.get('modelAccuracy', 0.92) * 100:.1f}%"
+        acc_table = Table([[Paragraph(acc_text, badge_style)]], colWidths=[50*mm])
+        acc_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), HexColor('#1A9E91')),
+            ('ROUNDEDCORNERS', [2, 2, 2, 2]),
+        ]))
+        story.append(acc_table)
+        story.append(Spacer(1, 3*mm))
+        
+        risk_color = risk_colors.get(rf["riskLevel"], HexColor('#059669'))
+        risk_text = f"{risk_labels.get(rf['riskLevel'], 'LOW RISK')} — Score: {rf['riskScore']:.1f}/100"
+        risk_table = Table([[Paragraph(risk_text, badge_style)]], colWidths=[70*mm])
+        risk_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), risk_color),
+            ('ROUNDEDCORNERS', [3, 3, 3, 3]),
+        ]))
+        story.append(risk_table)
+        story.append(Spacer(1, 4*mm))
+        
+        story.append(Paragraph(rf["recommendation"], body_style))
+        
+        # Feature importance
+        if rf.get("features"):
+            story.append(Paragraph("<b>Top Feature Importances</b>", ParagraphStyle('SubHeading', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=HexColor('#001F3F'), spaceBefore=4*mm)))
+            
+            feat_data = [["Feature", "Importance"]]
+            for f in rf["features"][:6]:
+                feat_data.append([f["name"], f"{f['importance']*100:.1f}%"])
+            
+            feat_table = Table(feat_data, colWidths=[100*mm, 60*mm])
+            feat_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), HexColor('#001F3F')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), white),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [white, HexColor('#F5F5F5')]),
+                ('GRID', (0, 0), (-1, -1), 0.5, HexColor('#E2E8F0')),
+                ('ROUNDEDCORNERS', [2, 2, 2, 2]),
+            ]))
+            story.append(feat_table)
     
-    ecg_section = ""
+    # ECG Section
     if data.get("ecgResult"):
         ecg = data["ecgResult"]
-        ecg_section = f'''
-        <div class="section">
-            <div class="section-title">VGG16 ECG Classification</div>
-            <div class="model-badge">CNN VGG16 &bull; Accuracy: {ecg.get("modelAccuracy", 0.75) * 100:.2f}%</div>
-            <div class="risk-badge" style="background:{risk_color(ecg["riskLevel"])}">
-                {ecg["classification"]} &mdash; Confidence: {ecg["confidence"] * 100:.1f}%
-            </div>
-            <div class="findings">{ecg["findings"]}</div>
-        </div>'''
+        story.append(Paragraph("VGG16 ECG Classification", heading_style))
+        
+        ecg_acc_text = f"CNN VGG16 • Accuracy: {ecg.get('modelAccuracy', 0.75) * 100:.1f}%"
+        ecg_acc_table = Table([[Paragraph(ecg_acc_text, badge_style)]], colWidths=[50*mm])
+        ecg_acc_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), HexColor('#1A9E91')),
+            ('ROUNDEDCORNERS', [2, 2, 2, 2]),
+        ]))
+        story.append(ecg_acc_table)
+        story.append(Spacer(1, 3*mm))
+        
+        ecg_risk_color = risk_colors.get(ecg["riskLevel"], HexColor('#059669'))
+        ecg_risk_text = f"{ecg['classification']} — Confidence: {ecg['confidence']*100:.1f}%"
+        ecg_risk_table = Table([[Paragraph(ecg_risk_text, badge_style)]], colWidths=[80*mm])
+        ecg_risk_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), ecg_risk_color),
+            ('ROUNDEDCORNERS', [3, 3, 3, 3]),
+        ]))
+        story.append(ecg_risk_table)
+        story.append(Spacer(1, 4*mm))
+        
+        story.append(Paragraph(ecg["findings"], body_style))
     
-    combined_section = ""
+    # Combined Section
     if data.get("mode") == "dual" and data.get("finalRiskLevel"):
-        combined_section = f'''
-        <div class="section combined">
-            <div class="section-title">Combined Triage Assessment</div>
-            <div class="risk-badge" style="background:{risk_color(data["finalRiskLevel"])}">
-                {risk_label(data["finalRiskLevel"])} &mdash; Confidence: {(data.get("confidenceScore", 0) * 100):.1f}%
-            </div>
-            <div class="findings">{data.get("finalRecommendation", "")}</div>
-        </div>'''
+        story.append(Paragraph("Combined Triage Assessment", heading_style))
+        
+        combined_color = risk_colors.get(data["finalRiskLevel"], HexColor('#059669'))
+        combined_text = f"{risk_labels.get(data['finalRiskLevel'], 'LOW RISK')} — Confidence: {(data.get('confidenceScore', 0) * 100):.1f}%"
+        combined_table = Table([[Paragraph(combined_text, badge_style)]], colWidths=[80*mm])
+        combined_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), combined_color),
+            ('ROUNDEDCORNERS', [3, 3, 3, 3]),
+        ]))
+        story.append(combined_table)
+        story.append(Spacer(1, 4*mm))
+        
+        story.append(Paragraph(data.get("finalRecommendation", ""), body_style))
     
-    return f'''<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8"/>
-    <title>CardioShield AI &mdash; Clinical Report</title>
-    <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: 'Segoe UI', Arial, sans-serif; color: #212121; padding: 40px; }}
-        .header {{ border-bottom: 3px solid #001F3F; padding-bottom: 16px; margin-bottom: 24px; }}
-        .brand {{ font-size: 24px; font-weight: 700; color: #001F3F; }}
-        .brand-sub {{ font-size: 12px; color: #1A9E91; font-weight: 600; }}
-        .mode-badge {{ display: inline-block; background: #001F3F; color: #fff; padding: 4px 12px; border-radius: 4px; font-size: 11px; margin-bottom: 20px; }}
-        .section {{ background: #F5F5F5; border-radius: 8px; padding: 20px; margin-bottom: 20px; border-left: 4px solid #1A9E91; }}
-        .section.combined {{ border-left-color: #001F3F; }}
-        .section-title {{ font-size: 14px; font-weight: 700; color: #001F3F; text-transform: uppercase; margin-bottom: 12px; }}
-        .model-badge {{ display: inline-block; background: #1A9E91; color: #fff; padding: 2px 10px; border-radius: 3px; font-size: 10px; margin-bottom: 10px; }}
-        .risk-badge {{ display: inline-block; color: #fff; padding: 6px 16px; border-radius: 4px; font-size: 13px; font-weight: 700; margin-bottom: 12px; }}
-        .findings {{ font-size: 13px; color: #424242; line-height: 1.7; }}
-        .disclaimer {{ margin-top: 24px; padding: 14px; background: #FFF3E0; border-left: 4px solid #B45309; border-radius: 4px; font-size: 11px; color: #5D4037; }}
-        .footer {{ margin-top: 20px; padding-top: 12px; border-top: 1px solid #e0e0e0; font-size: 10px; color: #9E9E9E; text-align: center; }}
-    </style>
-</head>
-<body>
-    <div class="header">
-        <div class="brand">CardioShield AI</div>
-        <div class="brand-sub">CLINICAL DECISION SUPPORT REPORT</div>
-        <div style="font-size: 11px; color: #757575; margin-top: 4px;">Generated: {date_str}</div>
-    </div>
-    <div class="mode-badge">{mode_labels.get(data.get("mode", "data"), "")}</div>
-    {rf_section}
-    {ecg_section}
-    {combined_section}
-    <div class="disclaimer"><strong>Clinical Disclaimer:</strong> CardioShield AI is a clinical decision support tool only. This report does NOT constitute a medical diagnosis.</div>
-    <div class="footer">CardioShield AI &bull; RF+SMOTE 92.02% &bull; VGG16 74.83%</div>
-</body>
-</html>'''
+    # Disclaimer
+    disclaimer_text = (
+        "<b>Clinical Disclaimer:</b> CardioShield AI is a clinical decision support tool only. "
+        "Results are generated by machine learning models (Random Forest + SMOTE and CNN VGG16) "
+        "trained on the Heart Statlog Cleveland Hungary dataset (1,190 records, 11 features). "
+        "This report does NOT constitute a medical diagnosis and must NOT be used as a substitute "
+        "for professional clinical evaluation by a qualified healthcare provider. All findings "
+        "require clinical correlation. In case of emergency, contact emergency services immediately."
+    )
+    story.append(Paragraph(disclaimer_text, disclaimer_style))
+    
+    # Footer
+    story.append(Spacer(1, 10*mm))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=HexColor('#E2E8F0')))
+    story.append(Spacer(1, 4*mm))
+    story.append(Paragraph(
+        "CardioShield AI • RF+SMOTE 92.02% • VGG16 74.83% • Heart Statlog Cleveland Hungary Dataset",
+        footer_style
+    ))
+    
+    # Build PDF
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
 
-def pdf_download_button(pdf_data, label="Download Clinical Report"):
-    """Generate a downloadable HTML report styled as a clinical PDF"""
-    pdf_html = generate_pdf_html(pdf_data)
-    b64 = base64.b64encode(pdf_html.encode()).decode()
-    filename = f"CardioShield_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+
+def pdf_download_button(pdf_data, label="Download Clinical Report (PDF)"):
+    """Generate a real downloadable PDF report"""
+    pdf_bytes = generate_pdf_bytes(pdf_data)
+    b64 = base64.b64encode(pdf_bytes).decode()
+    filename = f"CardioShield_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     icon_html = icon("fa-file-pdf")
-    href = f'<a href="data:text/html;base64,{b64}" download="{filename}" class="pdf-download-btn">{icon_html} {label}</a>'
+    href = f'<a href="data:application/pdf;base64,{b64}" download="{filename}" class="pdf-download-btn">{icon_html} {label}</a>'
     st.markdown(href, unsafe_allow_html=True)
 
 # ============================================================================
