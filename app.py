@@ -395,37 +395,35 @@ def fetch_demo_ecg(sample_type):
 # FEATURE IMPORTANCE AGGREGATION
 # ============================================================================
 
-@st.cache_resource
 def get_aggregated_feature_importance(_rf_model, _preprocessor):
-    """Aggregate feature importance from 22 post-OHE features back to 11 original clinical features"""
+    """Aggregate feature importance from post-OHE features back to original clinical features"""
     if _rf_model is None or _preprocessor is None:
         return None
     
     raw_importances = _rf_model.feature_importances_
     ohe_names = list(_preprocessor.get_feature_names_out())
     
-    # Exact mapping matching your preprocessor output
-    feature_map = {
-        'age': ['age'],
-        'resting bp s': ['resting bp s'],
-        'cholesterol': ['cholesterol'],
-        'max heart rate': ['max heart rate'],
-        'oldpeak': ['oldpeak'],
-        'sex': ['sex_0', 'sex_1'],
-        'chest pain type': ['chest pain type_1', 'chest pain type_2', 'chest pain type_3', 'chest pain type_4'],
-        'fasting blood sugar': ['fasting blood sugar_0', 'fasting blood sugar_1'],
-        'resting ecg': ['resting ecg_0', 'resting ecg_1', 'resting ecg_2'],
-        'exercise angina': ['exercise angina_0', 'exercise angina_1'],
-        'ST slope': ['ST slope_0', 'ST slope_1', 'ST slope_2', 'ST slope_3'],
+    # Define the 11 original feature groups with their OHE prefixes
+    feature_groups = {
+        'age': 'age',
+        'resting bp s': 'resting bp s',
+        'cholesterol': 'cholesterol',
+        'max heart rate': 'max heart rate',
+        'oldpeak': 'oldpeak',
+        'sex': 'sex_',
+        'chest pain type': 'chest pain type_',
+        'fasting blood sugar': 'fasting blood sugar_',
+        'resting ecg': 'resting ecg_',
+        'exercise angina': 'exercise angina_',
+        'ST slope': 'ST slope_',
     }
     
     aggregated = {}
-    for orig_name, ohe_variants in feature_map.items():
+    for orig_name, prefix in feature_groups.items():
         total_imp = 0.0
-        for ohe_variant in ohe_variants:
-            if ohe_variant in ohe_names:
-                idx = ohe_names.index(ohe_variant)
-                total_imp += float(raw_importances[idx])
+        for ohe_name, imp in zip(ohe_names, raw_importances):
+            if ohe_name == prefix or ohe_name.startswith(prefix):
+                total_imp += float(imp)
         if total_imp > 0:
             aggregated[orig_name] = total_imp
     
@@ -499,6 +497,7 @@ def predict_rf(patient_data, preprocessor, rf_model):
         recommendation = "Low cardiovascular risk profile. Continue routine preventive care. Maintain healthy lifestyle and schedule annual check-up."
     
     agg_importance = get_aggregated_feature_importance(rf_model, preprocessor)
+    print("DEBUG agg_importance:", agg_importance)
     features = []
     if agg_importance:
         features = [{"name": k, "importance": v} for k, v in agg_importance.items()]
