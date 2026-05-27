@@ -52,6 +52,23 @@ def inject_custom_css():
         
         .stApp {
             background-color: #F7F9FC;
+            margin-top: -60px;
+        }
+        
+        .stApp > header {
+            background: transparent;
+        }
+        
+        div[data-testid="stToolbar"] {
+            display: none;
+        }
+        
+        div[data-testid="stDecoration"] {
+            display: none;
+        }
+        
+        div[data-testid="stStatusWidget"] {
+            display: none;
         }
         
         #MainMenu {visibility: hidden;}
@@ -272,9 +289,9 @@ def icon(name, size="", color="", cls=""):
 MODEL_DIR = Path("models")
 MODEL_DIR.mkdir(exist_ok=True)
 
-PREPROCESSOR_URL = "https://github.com/Obika-Franklin/cardioshield-ai/releases/download/preprocessor/preprocessor.pkl"
-RF_MODEL_URL = "https://github.com/Obika-Franklin/cardioshield-ai/releases/download/rf_model/rf_model.pkl"
-VGG16_MODEL_URL = "https://github.com/Obika-Franklin/cardioshield-ai/releases/download/v1.0.0/vgg16_ecg_model.keras"
+PREPROCESSOR_URL = "https://github.com/FranklinObika/cardioshield-ai/releases/download/v1.0.0/preprocessor.pkl"
+RF_MODEL_URL = "https://github.com/FranklinObika/cardioshield-ai/releases/download/v1.0.0/rf_model.pkl"
+VGG16_MODEL_URL = "https://github.com/FranklinObika/cardioshield-ai/releases/download/v1.0.0/vgg16_ecg_model.keras"
 
 @st.cache_resource
 def download_file(url, filename):
@@ -319,6 +336,69 @@ def load_models():
     except Exception as e:
         st.warning(f"Model loading issue: {e}. Using simulation mode.")
         return None, None, None
+
+# ============================================================================
+# FEATURE IMPORTANCE AGGREGATION
+# ============================================================================
+
+@st.cache_resource
+def get_aggregated_feature_importance(rf_model, preprocessor):
+    """
+    Aggregate feature importance from 22 post-OHE features back to 11 original
+    clinical features, matching the training pipeline exactly.
+    """
+    if rf_model is None or preprocessor is None:
+        return None
+    
+    try:
+        raw_importances = rf_model.feature_importances_
+        n_features = len(raw_importances)
+        
+        if n_features == 11:
+            # Already aggregated, use directly
+            feature_names = ['age', 'sex', 'chest pain type', 'resting bp s', 'cholesterol',
+                           'fasting blood sugar', 'resting ecg', 'max heart rate',
+                           'exercise angina', 'oldpeak', 'ST slope']
+            return {name: float(imp) for name, imp in zip(feature_names, raw_importances)}
+        
+        elif n_features == 22:
+            # 22 post-OHE features → aggregate to 11 originals
+            ohe_names = preprocessor.get_feature_names_out()
+            
+            # Map original features to their OHE variants
+            feature_groups = {
+                'age': ['age'],
+                'sex': ['sex'],
+                'chest pain type': ['chest pain type'],
+                'resting bp s': ['resting bp s'],
+                'cholesterol': ['cholesterol'],
+                'fasting blood sugar': ['fasting blood sugar'],
+                'resting ecg': ['resting ecg'],
+                'max heart rate': ['max heart rate'],
+                'exercise angina': ['exercise angina'],
+                'oldpeak': ['oldpeak'],
+                'ST slope': ['ST slope']
+            }
+            
+            # Aggregate by summing importance of all OHE variants for each original feature
+            aggregated = {}
+            for orig_name, variants in feature_groups.items():
+                total_imp = 0.0
+                for i, ohe_name in enumerate(ohe_names):
+                    for variant in variants:
+                        if ohe_name.startswith(variant):
+                            total_imp += raw_importances[i]
+                            break
+                aggregated[orig_name] = float(total_imp)
+            
+            return aggregated
+        
+        else:
+            # Unexpected number, use as-is with generic names
+            return {f"feature_{i}": float(imp) for i, imp in enumerate(raw_importances)}
+    
+    except Exception:
+        return None
 
 # ============================================================================
 # DATABASE
@@ -375,14 +455,11 @@ def predict_rf(patient_data, preprocessor, rf_model):
             risk_level = "low"
             recommendation = "Low cardiovascular risk profile. Continue routine preventive care. Maintain healthy lifestyle and schedule annual check-up."
         
+        # Get aggregated feature importance from the real model
+        agg_importance = get_aggregated_feature_importance(rf_model, preprocessor)
         features = []
-        if hasattr(rf_model, 'feature_importances_'):
-            feature_names = ['age', 'sex', 'chest pain type', 'resting bp s', 'cholesterol',
-                           'fasting blood sugar', 'resting ecg', 'max heart rate',
-                           'exercise angina', 'oldpeak', 'ST slope']
-            importances = rf_model.feature_importances_
-            features = [{"name": name, "importance": float(imp)}
-                       for name, imp in zip(feature_names, importances)]
+        if agg_importance:
+            features = [{"name": k, "importance": v} for k, v in agg_importance.items()]
             features.sort(key=lambda x: x["importance"], reverse=True)
         
         return {
@@ -957,7 +1034,6 @@ def main():
             if not dual.get("ecgProvided"):
                 st.warning("ECG was not provided — results show Random Forest analysis only. Add an ECG input for dual-model combined triage.")
             
-            # FIXED: Handle single column case properly
             has_ecg = dual.get("ecgProvided", False)
             if has_ecg:
                 rc1, rc2 = st.columns([1, 1])
