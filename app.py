@@ -155,13 +155,6 @@ def inject_custom_css():
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
         
-        .ecg-preview {
-            background: #0a0f1a;
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid #1a2a3a;
-        }
-        
         .empty-state {
             border: 2px dashed #E2E8F0;
             border-radius: 16px;
@@ -292,6 +285,14 @@ def inject_custom_css():
             border: 1px solid #FECACA;
         }
         
+        .ecg-preview-container {
+            background: #0a0f1a;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #1a2a3a;
+            margin: 12px 0;
+        }
+        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -321,10 +322,14 @@ PREPROCESSOR_URL = "https://github.com/Obika-Franklin/cardioshield-ai/releases/d
 RF_MODEL_URL = "https://github.com/Obika-Franklin/cardioshield-ai/releases/download/rf_model/rf_model.pkl"
 VGG16_MODEL_URL = "https://github.com/Obika-Franklin/cardioshield-ai/releases/download/v1.0.0/vgg16_ecg_model.keras"
 
-# Demo ECG image URLs (real images, not SVGs)
 DEMO_ECG_URLS = {
     "normal": "https://github.com/Obika-Franklin/cardioshield-ai/releases/download/normal-ecg/Normal.97.-.Copy.jpg",
     "myocardial_infarction": "https://github.com/Obika-Franklin/cardioshield-ai/releases/download/myocardial-infarction/MI.99.-.Copy.jpg",
+}
+
+SAMPLE_LABELS = {
+    "normal": "Normal Sinus Rhythm",
+    "myocardial_infarction": "Myocardial Infarction (STEMI)",
 }
 
 @st.cache_resource
@@ -460,7 +465,7 @@ def get_waitlist_count():
     return init_db().execute('SELECT COUNT(*) FROM waitlist').fetchone()[0]
 
 # ============================================================================
-# INFERENCE (NO SIMULATION — REAL MODELS ONLY)
+# INFERENCE
 # ============================================================================
 
 def predict_rf(patient_data, preprocessor, rf_model):
@@ -468,7 +473,6 @@ def predict_rf(patient_data, preprocessor, rf_model):
     if preprocessor is None or rf_model is None:
         raise RuntimeError("Models not loaded. Please wait for models to download.")
     
-    # Map form field names to preprocessor column names exactly
     df = pd.DataFrame([{
         'age': patient_data.get('age', 45),
         'sex': patient_data.get('sex', 1),
@@ -546,7 +550,6 @@ def predict_ecg(image_data, vgg16_model):
         "riskLevel": risk_map.get(classification, "moderate"),
         "modelAccuracy": 0.7483,
         "modelName": "CNN VGG16",
-        "isDemo": False,
         "probabilities": {classes[i]: float(predictions[i]) for i in range(len(classes))}
     }
 
@@ -649,49 +652,6 @@ def risk_badge_html(level):
         "low": f'<span class="risk-badge-low">{icon("fa-circle-check")} LOW RISK</span>'
     }
     return badges.get(level, badges["low"])
-
-# ============================================================================
-# ECG SAMPLES (inline SVGs for preview only — real inference uses fetched JPGs)
-# ============================================================================
-
-def get_ecg_sample_svg(sample_type):
-    """SVG preview only — actual inference uses real JPG images from GitHub"""
-    paths = {
-        "normal": ("0,100 20,100 25,98 30,100 35,100 40,100 42,95 44,100 46,55 48,100 50,108 52,100 "
-                   "70,100 75,98 80,100 90,100 92,95 94,100 96,55 98,100 100,108 102,100 "
-                   "120,100 125,98 130,100 140,100 142,95 144,100 146,55 148,100 150,108 152,100 "
-                   "170,100 175,98 180,100 190,100 192,95 194,100 196,55 198,100 200,108 202,100 "
-                   "220,100 225,98 230,100 240,100 242,95 244,100 246,55 248,100 250,108 252,100 "
-                   "270,100 275,98 280,100 290,100 292,95 294,100 296,55 298,100 300,108 302,100 "
-                   "320,100 325,98 330,100 340,100 342,95 344,100 346,55 348,100 350,108 352,100 "
-                   "370,100 375,98 380,100 390,100 392,95 394,100 396,55 398,100 400,108 402,100 "
-                   "420,100 440,100 460,100 480,100 500,100 520,100 560,100 600,100",
-                   "#26A69A", "Normal ECG", "Regular P-QRS-T  |  Normal Sinus Rhythm"),
-        "myocardial_infarction": (
-                   "0,100 15,100 20,98 25,100 30,100 32,90 34,100 35,40 36,130 37,100 38,75 42,100 "
-                   "60,100 62,90 64,100 65,40 66,130 67,100 68,75 72,100 "
-                   "90,100 92,90 94,100 95,40 96,130 97,100 98,75 102,100 "
-                   "120,100 122,90 124,100 125,40 126,130 127,100 128,75 132,100 "
-                   "150,100 152,90 154,100 155,40 156,130 157,100 158,75 162,100 "
-                   "180,100 182,90 184,100 185,40 186,130 187,100 188,75 192,100 "
-                   "210,100 212,90 214,100 215,40 216,130 217,100 218,75 222,100 "
-                   "240,100 242,90 244,100 245,40 246,130 247,100 248,75 252,100 "
-                   "270,100 300,100 330,100 360,100 400,100 440,100 480,100 560,100 600,100",
-                   "#ef4444", "Myocardial Infarction", "ST Elevation  |  Pathological Q-waves"),
-    }
-    
-    path, color, label, desc = paths.get(sample_type, paths["normal"])
-    
-    return f'''
-    <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="200" viewBox="0 0 600 200">
-        <rect width="600" height="200" fill="#0a0f1a" rx="8"/>
-        <polyline points="{path}" fill="none" stroke="{color}" stroke-width="2.5" 
-                  stroke-linecap="round" stroke-linejoin="round"/>
-        <text x="12" y="18" font-family="monospace" font-size="11" fill="#26A69A" font-weight="bold">{label}</text>
-        <text x="12" y="190" font-family="monospace" font-size="9" fill="#557799">{desc}</text>
-        <text x="550" y="18" font-family="monospace" font-size="10" fill="#334455" text-anchor="end">Lead II</text>
-    </svg>
-    '''
 
 # ============================================================================
 # PDF GENERATION
@@ -802,7 +762,6 @@ def main():
     rf_ready = preprocessor is not None and rf_model is not None
     vgg16_ready = vgg16_model is not None
     
-    # Initialize all session state variables
     defaults = {
         'ecg_sample': None,
         'ecg_image': None,
@@ -810,7 +769,7 @@ def main():
         'ecg_result': None,
         'dual_result': None,
         'data_rf_result': None,
-        # Data-only form widget keys
+        'ecg_preview_image': None,  # Stores base64 of fetched demo ECG for preview
         'data_age_widget': 45,
         'data_sex_widget': 1,
         'data_chest_pain_widget': 2,
@@ -822,7 +781,6 @@ def main():
         'data_ex_angina_widget': False,
         'data_oldpeak_widget': 0.0,
         'data_st_slope_widget': 1,
-        # Dual mode form widget keys
         'dual_age_widget': 45,
         'dual_sex_widget': 1,
         'dual_chest_pain_widget': 2,
@@ -834,7 +792,6 @@ def main():
         'dual_ex_angina_widget': False,
         'dual_oldpeak_widget': 0.0,
         'dual_st_slope_widget': 1,
-        # Preset triggers
         'data_preset': None,
         'dual_preset': None,
     }
@@ -954,7 +911,6 @@ def main():
             st.markdown("#### Patient Vitals")
             patient_name = st.text_input("Patient ID / Name", key="dual_patient_name")
             
-            # Apply dual preset BEFORE widgets render
             if st.session_state.get('dual_preset') == 'low':
                 st.session_state.dual_age_widget = 40
                 st.session_state.dual_sex_widget = 1
@@ -1000,7 +956,6 @@ def main():
                 fbs = st.toggle("Fasting Blood Sugar >120", key="dual_fbs_widget")
                 ex_angina = st.toggle("Exercise Induced Angina", key="dual_ex_angina_widget")
             
-            # Quick load buttons
             qc1, qc2 = st.columns(2)
             with qc1:
                 if st.button("Load Low Risk", width="stretch", key="dual_load_low"):
@@ -1053,18 +1008,29 @@ def main():
                                     format_func=lambda i: sample_labels[i], index=current_idx, key="dual_sample_select")
             
             if sample_options[selected] is not None:
-                st.session_state.ecg_sample = sample_options[selected]
-                st.session_state.ecg_image = None
-                svg = get_ecg_sample_svg(st.session_state.ecg_sample)
-                st.markdown(f'<div class="ecg-preview" style="margin:12px 0;">{svg}</div>', unsafe_allow_html=True)
+                new_sample = sample_options[selected]
+                # Fetch real image if sample changed
+                if st.session_state.ecg_sample != new_sample:
+                    st.session_state.ecg_sample = new_sample
+                    st.session_state.ecg_image = None
+                    st.session_state.ecg_preview_image = fetch_demo_ecg(new_sample)
+                # Show real ECG image preview
+                if st.session_state.ecg_preview_image:
+                    try:
+                        img_bytes = base64.b64decode(st.session_state.ecg_preview_image)
+                        st.image(img_bytes, caption=f"Demo: {SAMPLE_LABELS.get(st.session_state.ecg_sample, '')}", width='stretch')
+                    except Exception:
+                        st.caption(f"Demo sample selected: {SAMPLE_LABELS.get(st.session_state.ecg_sample, '')}")
                 if not vgg16_ready:
                     st.warning("VGG16 model not loaded. Demo sample cannot be classified.")
             else:
                 st.session_state.ecg_sample = None
+                st.session_state.ecg_preview_image = None
             
             uploaded_file = st.file_uploader("Upload ECG Image (PNG, JPG up to 20MB)", type=["png", "jpg", "jpeg"], key="dual_ecg_upload")
             if uploaded_file:
                 st.session_state.ecg_sample = None
+                st.session_state.ecg_preview_image = None
                 st.session_state.ecg_image = base64.b64encode(uploaded_file.getvalue()).decode()
                 st.image(uploaded_file, caption="Uploaded ECG", width='stretch')
                 if not vgg16_ready:
@@ -1191,7 +1157,7 @@ def main():
             pdf_download_button(pdf_data, "Download Clinical Report (PDF)")
     
     # ========================================================================
-    # TAB 2: ECG-ONLY (real model only)
+    # TAB 2: ECG-ONLY
     # ========================================================================
     
     with tab2:
@@ -1210,20 +1176,30 @@ def main():
                                     format_func=lambda i: sample_labels[i], index=current_idx, key="ecg_only_sample")
             
             if sample_options[selected] is not None:
-                st.session_state.ecg_sample = sample_options[selected]
-                st.session_state.ecg_image = None
-                svg = get_ecg_sample_svg(st.session_state.ecg_sample)
-                st.markdown(f'<div class="ecg-preview" style="margin:12px 0;">{svg}</div>', unsafe_allow_html=True)
+                new_sample = sample_options[selected]
+                if st.session_state.ecg_sample != new_sample:
+                    st.session_state.ecg_sample = new_sample
+                    st.session_state.ecg_image = None
+                    st.session_state.ecg_preview_image = fetch_demo_ecg(new_sample)
+                # Show real ECG image preview
+                if st.session_state.ecg_preview_image:
+                    try:
+                        img_bytes = base64.b64decode(st.session_state.ecg_preview_image)
+                        st.image(img_bytes, caption=f"Demo: {SAMPLE_LABELS.get(st.session_state.ecg_sample, '')}", width='stretch')
+                    except Exception:
+                        st.caption(f"Demo sample selected: {SAMPLE_LABELS.get(st.session_state.ecg_sample, '')}")
                 if not vgg16_ready:
                     st.warning("VGG16 model not loaded. Demo sample cannot be classified.")
             else:
                 st.session_state.ecg_sample = None
+                st.session_state.ecg_preview_image = None
             
             st.markdown("---")
             st.caption("or upload an ECG image")
             uploaded_file = st.file_uploader("Upload ECG Image", type=["png", "jpg", "jpeg"], key="ecg_only_upload")
             if uploaded_file:
                 st.session_state.ecg_sample = None
+                st.session_state.ecg_preview_image = None
                 st.session_state.ecg_image = base64.b64encode(uploaded_file.getvalue()).decode()
                 st.image(uploaded_file, caption="Uploaded ECG", width='stretch')
                 if not vgg16_ready:
@@ -1318,7 +1294,6 @@ def main():
         with dc1:
             patient_name = st.text_input("Patient ID / Name", key="data_patient_name")
             
-            # Apply preset BEFORE widgets render
             if st.session_state.get('data_preset') == 'low':
                 st.session_state.data_age_widget = 40
                 st.session_state.data_sex_widget = 1
