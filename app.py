@@ -93,27 +93,30 @@ def inject_custom_css():
         }
         
         .form-column {
-            background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
-            border-radius: 20px;
-            padding: 24px;
-            box-shadow: 0 4px 24px rgba(11, 31, 58, 0.08), 0 1px 4px rgba(11, 31, 58, 0.04);
-            border: 1px solid #E8ECF0;
+            background: #FFFFFF;
+            border-radius: 16px;
+            padding: 28px;
+            box-shadow: 0 1px 3px rgba(11, 31, 58, 0.08), 0 0 0 1px rgba(11, 31, 58, 0.06);
+            border: 1px solid #E2E8F0;
+            height: 100%;
         }
         
         .display-column {
-            background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
-            border-radius: 20px;
-            padding: 24px;
-            box-shadow: 0 4px 24px rgba(46, 196, 182, 0.08), 0 1px 4px rgba(11, 31, 58, 0.04);
-            border: 1px solid #D0F0EC;
+            background: #FFFFFF;
+            border-radius: 16px;
+            padding: 28px;
+            box-shadow: 0 1px 3px rgba(46, 196, 182, 0.10), 0 0 0 1px rgba(46, 196, 182, 0.08);
+            border: 1px solid #B8E8E0;
+            height: 100%;
         }
         
         .display-column-ecg {
-            background: linear-gradient(135deg, #FFFFFF 0%, #FAFAFA 100%);
-            border-radius: 20px;
-            padding: 24px;
-            box-shadow: 0 4px 24px rgba(239, 68, 68, 0.06), 0 1px 4px rgba(11, 31, 58, 0.04);
-            border: 1px solid #F5E0E0;
+            background: #FFFFFF;
+            border-radius: 16px;
+            padding: 28px;
+            box-shadow: 0 1px 3px rgba(239, 68, 68, 0.08), 0 0 0 1px rgba(239, 68, 68, 0.06);
+            border: 1px solid #F5D0D0;
+            height: 100%;
         }
         
         .risk-badge-high {
