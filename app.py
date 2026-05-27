@@ -394,40 +394,66 @@ def fetch_demo_ecg(sample_type):
 # ============================================================================
 # FEATURE IMPORTANCE AGGREGATION
 # ============================================================================
-@st.cache_resource
 def get_aggregated_feature_importance(_rf_model, _preprocessor):
     """Aggregate feature importance from post-OHE features back to original clinical features"""
     if _rf_model is None or _preprocessor is None:
+        st.warning("get_aggregated_feature_importance: model or preprocessor is None")
         return None
     
-    raw_importances = _rf_model.feature_importances_
-    ohe_names = list(_preprocessor.get_feature_names_out())
-    
-    # Define the 11 original feature groups with their OHE prefixes
-    feature_groups = {
-        'age': 'age',
-        'resting bp s': 'resting bp s',
-        'cholesterol': 'cholesterol',
-        'max heart rate': 'max heart rate',
-        'oldpeak': 'oldpeak',
-        'sex': 'sex_',
-        'chest pain type': 'chest pain type_',
-        'fasting blood sugar': 'fasting blood sugar_',
-        'resting ecg': 'resting ecg_',
-        'exercise angina': 'exercise angina_',
-        'ST slope': 'ST slope_',
-    }
-    
-    aggregated = {}
-    for orig_name, prefix in feature_groups.items():
-        total_imp = 0.0
-        for ohe_name, imp in zip(ohe_names, raw_importances):
-            if ohe_name == prefix or ohe_name.startswith(prefix):
-                total_imp += float(imp)
-        if total_imp > 0:
+    try:
+        raw_importances = _rf_model.feature_importances_
+        ohe_names = list(_preprocessor.get_feature_names_out())
+        
+        st.write("DEBUG: n_features =", len(raw_importances))
+        st.write("DEBUG: ohe_names =", ohe_names)
+        st.write("DEBUG: raw_importances =", raw_importances)
+        
+        # If exactly 11, use directly
+        if len(raw_importances) == 11:
+            feature_names = ['age', 'sex', 'chest pain type', 'resting bp s', 'cholesterol',
+                           'fasting blood sugar', 'resting ecg', 'max heart rate',
+                           'exercise angina', 'oldpeak', 'ST slope']
+            result = {name: float(imp) for name, imp in zip(feature_names, raw_importances)}
+            st.write("DEBUG: 11-feature result =", result)
+            return result
+        
+        # Otherwise aggregate
+        feature_map = {
+            'age': ['age'],
+            'resting bp s': ['resting bp s'],
+            'cholesterol': ['cholesterol'],
+            'max heart rate': ['max heart rate'],
+            'oldpeak': ['oldpeak'],
+            'sex': ['sex_0', 'sex_1'],
+            'chest pain type': ['chest pain type_1', 'chest pain type_2', 'chest pain type_3', 'chest pain type_4'],
+            'fasting blood sugar': ['fasting blood sugar_0', 'fasting blood sugar_1'],
+            'resting ecg': ['resting ecg_0', 'resting ecg_1', 'resting ecg_2'],
+            'exercise angina': ['exercise angina_0', 'exercise angina_1'],
+            'ST slope': ['ST slope_0', 'ST slope_1', 'ST slope_2', 'ST slope_3'],
+        }
+        
+        aggregated = {}
+        for orig_name, ohe_variants in feature_map.items():
+            total_imp = 0.0
+            for ohe_variant in ohe_variants:
+                if ohe_variant in ohe_names:
+                    idx = ohe_names.index(ohe_variant)
+                    total_imp += float(raw_importances[idx])
             aggregated[orig_name] = total_imp
-    
-    return aggregated if aggregated else None
+        
+        st.write("DEBUG: aggregated =", aggregated)
+        
+        if any(v > 0 for v in aggregated.values()):
+            return aggregated
+        else:
+            st.warning("All aggregated importances are zero")
+            return None
+            
+    except Exception as e:
+        st.error(f"get_aggregated_feature_importance error: {e}")
+        import traceback
+        st.code(traceback.format_exc())
+        return None
 
 # ============================================================================
 # DATABASE
