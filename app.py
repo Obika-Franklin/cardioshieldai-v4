@@ -501,6 +501,7 @@ def predict_rf(patient_data, preprocessor, rf_model):
         recommendation = "Low cardiovascular risk profile. Continue routine preventive care. Maintain healthy lifestyle and schedule annual check-up."
     
     agg_importance = get_aggregated_feature_importance(rf_model, preprocessor)
+    st.write("DEBUG - agg_importance:", agg_importance)
     features = []
     if agg_importance:
         features = [{"name": k, "importance": v} for k, v in agg_importance.items()]
