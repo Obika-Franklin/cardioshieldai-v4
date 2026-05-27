@@ -397,42 +397,41 @@ def fetch_demo_ecg(sample_type):
 
 @st.cache_resource
 def get_aggregated_feature_importance(_rf_model, _preprocessor):
-    """Aggregate feature importance from post-OHE features back to original clinical features"""
+    """Aggregate feature importance from 22 post-OHE features back to 11 original clinical features"""
     if _rf_model is None or _preprocessor is None:
         return None
     
-    try:
-        raw_importances = _rf_model.feature_importances_
-        n_features = len(raw_importances)
-        
-        feature_names = ['age', 'sex', 'chest pain type', 'resting bp s', 'cholesterol',
-                       'fasting blood sugar', 'resting ecg', 'max heart rate',
-                       'exercise angina', 'oldpeak', 'ST slope']
-        
-        if n_features == 11:
-            return {name: float(imp) for name, imp in zip(feature_names, raw_importances)}
-        
-        elif n_features > 11:
-            ohe_names = _preprocessor.get_feature_names_out()
-            feature_groups = {name: [name] for name in feature_names}
-            
-            aggregated = {}
-            for orig_name, variants in feature_groups.items():
-                total_imp = 0.0
-                for i, ohe_name in enumerate(ohe_names):
-                    for variant in variants:
-                        if ohe_name.startswith(variant):
-                            total_imp += raw_importances[i]
-                            break
-                aggregated[orig_name] = float(total_imp)
-            
-            return aggregated
-        
-        else:
-            return {f"feature_{i}": float(imp) for i, imp in enumerate(raw_importances)}
+    raw_importances = _rf_model.feature_importances_
     
-    except Exception:
-        return None
+    # Build mapping from OHE column names to original features
+    ohe_names = _preprocessor.get_feature_names_out()
+    
+    # Define which OHE columns map to which original features
+    feature_groups = {
+        'age': ['age'],
+        'resting bp s': ['resting bp s'],
+        'cholesterol': ['cholesterol'],
+        'max heart rate': ['max heart rate'],
+        'oldpeak': ['oldpeak'],
+        'sex': ['sex_0', 'sex_1'],
+        'chest pain type': ['chest pain type_1', 'chest pain type_2', 'chest pain type_3', 'chest pain type_4'],
+        'fasting blood sugar': ['fasting blood sugar_0', 'fasting blood sugar_1'],
+        'resting ecg': ['resting ecg_0', 'resting ecg_1', 'resting ecg_2'],
+        'exercise angina': ['exercise angina_0', 'exercise angina_1'],
+        'ST slope': ['ST slope_0', 'ST slope_1', 'ST slope_2', 'ST slope_3'],
+    }
+    
+    # Aggregate importances
+    aggregated = {}
+    for orig_name, ohe_variants in feature_groups.items():
+        total_imp = 0.0
+        for ohe_variant in ohe_variants:
+            if ohe_variant in ohe_names:
+                idx = list(ohe_names).index(ohe_variant)
+                total_imp += float(raw_importances[idx])
+        aggregated[orig_name] = total_imp
+    
+    return aggregated if any(v > 0 for v in aggregated.values()) else None
 
 # ============================================================================
 # DATABASE
