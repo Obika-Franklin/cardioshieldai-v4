@@ -92,6 +92,30 @@ def inject_custom_css():
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
         
+        .form-column {
+            background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 4px 24px rgba(11, 31, 58, 0.08), 0 1px 4px rgba(11, 31, 58, 0.04);
+            border: 1px solid #E8ECF0;
+        }
+        
+        .display-column {
+            background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 4px 24px rgba(46, 196, 182, 0.08), 0 1px 4px rgba(11, 31, 58, 0.04);
+            border: 1px solid #D0F0EC;
+        }
+        
+        .display-column-ecg {
+            background: linear-gradient(135deg, #FFFFFF 0%, #FAFAFA 100%);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 4px 24px rgba(239, 68, 68, 0.06), 0 1px 4px rgba(11, 31, 58, 0.04);
+            border: 1px solid #F5E0E0;
+        }
+        
         .risk-badge-high {
             background: #FEE2E2;
             color: #EF4444;
@@ -285,14 +309,6 @@ def inject_custom_css():
             border: 1px solid #FECACA;
         }
         
-        .ecg-preview-container {
-            background: #0a0f1a;
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid #1a2a3a;
-            margin: 12px 0;
-        }
-        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -394,6 +410,7 @@ def fetch_demo_ecg(sample_type):
 # ============================================================================
 # FEATURE IMPORTANCE AGGREGATION
 # ============================================================================
+
 def get_aggregated_feature_importance(_rf_model, _preprocessor):
     """Aggregate feature importance from post-OHE features back to original clinical features"""
     if _rf_model is None or _preprocessor is None:
@@ -405,7 +422,6 @@ def get_aggregated_feature_importance(_rf_model, _preprocessor):
     # Strip pipeline prefixes to get clean feature names
     clean_names = []
     for name in ohe_names:
-        # Remove 'num_pipeline__' or 'cat_pipeline__' prefix
         if '__' in name:
             clean_names.append(name.split('__', 1)[1])
         else:
@@ -506,7 +522,6 @@ def predict_rf(patient_data, preprocessor, rf_model):
         recommendation = "Low cardiovascular risk profile. Continue routine preventive care. Maintain healthy lifestyle and schedule annual check-up."
     
     agg_importance = get_aggregated_feature_importance(rf_model, preprocessor)
-    print("DEBUG agg_importance:", agg_importance)
     features = []
     if agg_importance:
         features = [{"name": k, "importance": v} for k, v in agg_importance.items()]
@@ -774,7 +789,7 @@ def main():
         'ecg_result': None,
         'dual_result': None,
         'data_rf_result': None,
-        'ecg_preview_image': None,  # Stores base64 of fetched demo ECG for preview
+        'ecg_preview_image': None,
         'data_age_widget': 45,
         'data_sex_widget': 1,
         'data_chest_pain_widget': 2,
@@ -913,6 +928,7 @@ def main():
         col1, col2 = st.columns([1, 1])
         
         with col1:
+            st.markdown('<div class="form-column">', unsafe_allow_html=True)
             st.markdown("#### Patient Vitals")
             patient_name = st.text_input("Patient ID / Name", key="dual_patient_name")
             
@@ -930,16 +946,16 @@ def main():
                 st.session_state.dual_st_slope_widget = 1
                 st.session_state.dual_preset = None
             elif st.session_state.get('dual_preset') == 'high':
-                st.session_state.dual_age_widget = 49
+                st.session_state.dual_age_widget = 48
                 st.session_state.dual_sex_widget = 0
-                st.session_state.dual_chest_pain_widget = 3
-                st.session_state.dual_resting_bp_widget = 160
-                st.session_state.dual_cholesterol_widget = 180
+                st.session_state.dual_chest_pain_widget = 4
+                st.session_state.dual_resting_bp_widget = 138
+                st.session_state.dual_cholesterol_widget = 214
                 st.session_state.dual_fbs_widget = False
                 st.session_state.dual_resting_ecg_widget = 0
-                st.session_state.dual_max_hr_widget = 156
-                st.session_state.dual_ex_angina_widget = False
-                st.session_state.dual_oldpeak_widget = 1.0
+                st.session_state.dual_max_hr_widget = 108
+                st.session_state.dual_ex_angina_widget = True
+                st.session_state.dual_oldpeak_widget = 1.5
                 st.session_state.dual_st_slope_widget = 2
                 st.session_state.dual_preset = None
             
@@ -1000,8 +1016,10 @@ def main():
                             st.session_state.ecg_result = None
                     except Exception as e:
                         st.error(f"Prediction failed: {e}")
+            st.markdown('</div>', unsafe_allow_html=True)
         
         with col2:
+            st.markdown('<div class="display-column-ecg">', unsafe_allow_html=True)
             st.markdown("#### ECG Image Scanner")
             
             sample_options = [None, "normal", "myocardial_infarction"]
@@ -1014,12 +1032,10 @@ def main():
             
             if sample_options[selected] is not None:
                 new_sample = sample_options[selected]
-                # Fetch real image if sample changed
                 if st.session_state.ecg_sample != new_sample:
                     st.session_state.ecg_sample = new_sample
                     st.session_state.ecg_image = None
                     st.session_state.ecg_preview_image = fetch_demo_ecg(new_sample)
-                # Show real ECG image preview
                 if st.session_state.ecg_preview_image:
                     try:
                         img_bytes = base64.b64decode(st.session_state.ecg_preview_image)
@@ -1043,6 +1059,7 @@ def main():
             
             if not st.session_state.ecg_sample and not st.session_state.ecg_image:
                 st.info("No ECG selected — RF + SMOTE will still run on patient vitals. Select a sample or upload an ECG to enable dual-model triage.")
+            st.markdown('</div>', unsafe_allow_html=True)
         
         # Results
         if st.session_state.dual_result:
@@ -1172,6 +1189,7 @@ def main():
         ec1, ec2 = st.columns([1, 1])
         
         with ec1:
+            st.markdown('<div class="form-column">', unsafe_allow_html=True)
             sample_options = [None, "normal", "myocardial_infarction"]
             sample_labels = ["None", "Normal Sinus Rhythm", "Myocardial Infarction (STEMI)"]
             
@@ -1186,7 +1204,6 @@ def main():
                     st.session_state.ecg_sample = new_sample
                     st.session_state.ecg_image = None
                     st.session_state.ecg_preview_image = fetch_demo_ecg(new_sample)
-                # Show real ECG image preview
                 if st.session_state.ecg_preview_image:
                     try:
                         img_bytes = base64.b64decode(st.session_state.ecg_preview_image)
@@ -1230,9 +1247,11 @@ def main():
                                 st.session_state.ecg_result = predict_ecg(demo_image, vgg16_model)
                             except Exception as e:
                                 st.error(f"ECG prediction failed: {e}")
+            st.markdown('</div>', unsafe_allow_html=True)
         
         with ec2:
             if st.session_state.ecg_result:
+                st.markdown('<div class="display-column-ecg">', unsafe_allow_html=True)
                 ecg = st.session_state.ecg_result
                 is_normal = ecg["riskLevel"] == "low"
                 conf_pct = int(ecg["confidence"] * 100)
@@ -1276,6 +1295,7 @@ def main():
                 
                 pdf_data = {"mode": "ecg", "ecgResult": ecg}
                 pdf_download_button(pdf_data, "Download ECG Report (PDF)")
+                st.markdown('</div>', unsafe_allow_html=True)
             else:
                 empty_icon = icon("fa-heart-pulse", "3rem", "#2EC4B6")
                 st.markdown(f"""
@@ -1297,6 +1317,7 @@ def main():
         dc1, dc2 = st.columns([1.2, 1])
         
         with dc1:
+            st.markdown('<div class="form-column">', unsafe_allow_html=True)
             patient_name = st.text_input("Patient ID / Name", key="data_patient_name")
             
             if st.session_state.get('data_preset') == 'low':
@@ -1313,16 +1334,16 @@ def main():
                 st.session_state.data_st_slope_widget = 1
                 st.session_state.data_preset = None
             elif st.session_state.get('data_preset') == 'high':
-                st.session_state.data_age_widget = 49
+                st.session_state.data_age_widget = 48
                 st.session_state.data_sex_widget = 0
-                st.session_state.data_chest_pain_widget = 3
-                st.session_state.data_resting_bp_widget = 160
-                st.session_state.data_cholesterol_widget = 180
+                st.session_state.data_chest_pain_widget = 4
+                st.session_state.data_resting_bp_widget = 138
+                st.session_state.data_cholesterol_widget = 214
                 st.session_state.data_fbs_widget = False
                 st.session_state.data_resting_ecg_widget = 0
-                st.session_state.data_max_hr_widget = 156
-                st.session_state.data_ex_angina_widget = False
-                st.session_state.data_oldpeak_widget = 1.0
+                st.session_state.data_max_hr_widget = 108
+                st.session_state.data_ex_angina_widget = True
+                st.session_state.data_oldpeak_widget = 1.5
                 st.session_state.data_st_slope_widget = 2
                 st.session_state.data_preset = None
             
@@ -1368,9 +1389,11 @@ def main():
                         st.session_state.data_rf_result = predict_rf(patient_data, preprocessor, rf_model)
                     except Exception as e:
                         st.error(f"RF prediction failed: {e}")
+            st.markdown('</div>', unsafe_allow_html=True)
         
         with dc2:
             if st.session_state.data_rf_result:
+                st.markdown('<div class="display-column">', unsafe_allow_html=True)
                 rf = st.session_state.data_rf_result
                 st.markdown("<div class='result-card'>", unsafe_allow_html=True)
                 st.markdown("#### Clinical Assessment")
@@ -1391,6 +1414,7 @@ def main():
                 
                 pdf_data = {"mode": "data", "rfResult": rf}
                 pdf_download_button(pdf_data, "Download Clinical Report (PDF)")
+                st.markdown('</div>', unsafe_allow_html=True)
             else:
                 empty_icon = icon("fa-chart-bar", "3rem", "#2EC4B6")
                 st.markdown(f"""
