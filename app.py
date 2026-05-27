@@ -321,6 +321,12 @@ PREPROCESSOR_URL = "https://github.com/Obika-Franklin/cardioshield-ai/releases/d
 RF_MODEL_URL = "https://github.com/Obika-Franklin/cardioshield-ai/releases/download/rf_model/rf_model.pkl"
 VGG16_MODEL_URL = "https://github.com/Obika-Franklin/cardioshield-ai/releases/download/v1.0.0/vgg16_ecg_model.keras"
 
+# Demo ECG image URLs (real images, not SVGs)
+DEMO_ECG_URLS = {
+    "normal": "https://github.com/Obika-Franklin/cardioshield-ai/releases/download/normal-ecg/Normal.97.-.Copy.jpg",
+    "myocardial_infarction": "https://github.com/Obika-Franklin/cardioshield-ai/releases/download/myocardial-infarction/MI.99.-.Copy.jpg",
+}
+
 @st.cache_resource
 def download_file(url, filename):
     """Download a file with progress tracking"""
@@ -366,18 +372,32 @@ def load_models():
     
     return preprocessor, rf_model, vgg16_model
 
+@st.cache_data
+def fetch_demo_ecg(sample_type):
+    """Fetch demo ECG image from GitHub releases and return as base64"""
+    url = DEMO_ECG_URLS.get(sample_type)
+    if not url:
+        return None
+    try:
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        return base64.b64encode(response.content).decode()
+    except Exception as e:
+        st.error(f"Failed to fetch demo ECG: {e}")
+        return None
+
 # ============================================================================
 # FEATURE IMPORTANCE AGGREGATION
 # ============================================================================
 
 @st.cache_resource
-def get_aggregated_feature_importance(rf_model, preprocessor):
+def get_aggregated_feature_importance(_rf_model, preprocessor):
     """Aggregate feature importance from post-OHE features back to original clinical features"""
-    if rf_model is None or preprocessor is None:
+    if _rf_model is None or preprocessor is None:
         return None
     
     try:
-        raw_importances = rf_model.feature_importances_
+        raw_importances = _rf_model.feature_importances_
         n_features = len(raw_importances)
         
         feature_names = ['age', 'sex', 'chest pain type', 'resting bp s', 'cholesterol',
@@ -440,7 +460,7 @@ def get_waitlist_count():
     return init_db().execute('SELECT COUNT(*) FROM waitlist').fetchone()[0]
 
 # ============================================================================
-# INFERENCE (NO SIMULATION FALLBACKS)
+# INFERENCE (NO SIMULATION — REAL MODELS ONLY)
 # ============================================================================
 
 def predict_rf(patient_data, preprocessor, rf_model):
@@ -528,24 +548,6 @@ def predict_ecg(image_data, vgg16_model):
         "modelName": "CNN VGG16",
         "isDemo": False,
         "probabilities": {classes[i]: float(predictions[i]) for i in range(len(classes))}
-    }
-
-def simulate_ecg_for_demo():
-    """Generate a simulated ECG result for demo SVG samples only."""
-    return {
-        "classification": "Normal Sinus Rhythm",
-        "confidence": 0.92,
-        "findings": "Regular P-QRS-T waveform pattern. No ST segment abnormalities detected. Heart rate within normal range.",
-        "riskLevel": "low",
-        "modelAccuracy": 0.7483,
-        "modelName": "CNN VGG16",
-        "isDemo": True,
-        "probabilities": {
-            "normal": 0.92,
-            "myocardial_infarction": 0.03,
-            "history_mi": 0.03,
-            "abnormal_heartbeat": 0.02
-        }
     }
 
 def combine_results(rf_result, ecg_result=None):
@@ -649,10 +651,11 @@ def risk_badge_html(level):
     return badges.get(level, badges["low"])
 
 # ============================================================================
-# ECG SAMPLES (inline SVGs)
+# ECG SAMPLES (inline SVGs for preview only — real inference uses fetched JPGs)
 # ============================================================================
 
 def get_ecg_sample_svg(sample_type):
+    """SVG preview only — actual inference uses real JPG images from GitHub"""
     paths = {
         "normal": ("0,100 20,100 25,98 30,100 35,100 40,100 42,95 44,100 46,55 48,100 50,108 52,100 "
                    "70,100 75,98 80,100 90,100 92,95 94,100 96,55 98,100 100,108 102,100 "
@@ -675,27 +678,6 @@ def get_ecg_sample_svg(sample_type):
                    "240,100 242,90 244,100 245,40 246,130 247,100 248,75 252,100 "
                    "270,100 300,100 330,100 360,100 400,100 440,100 480,100 560,100 600,100",
                    "#ef4444", "Myocardial Infarction", "ST Elevation  |  Pathological Q-waves"),
-        "history_mi": (
-                   "0,100 20,100 22,95 24,100 30,100 32,90 34,108 35,50 37,130 39,100 42,90 45,100 "
-                   "60,100 62,90 64,108 65,50 67,130 69,100 72,90 75,100 "
-                   "90,100 92,90 94,108 95,50 97,130 99,100 102,90 105,100 "
-                   "120,100 122,90 124,108 125,50 127,130 129,100 132,90 135,100 "
-                   "150,100 152,90 154,108 155,50 157,130 159,100 162,90 165,100 "
-                   "180,100 182,90 184,108 185,50 187,130 189,100 192,90 195,100 "
-                   "210,100 212,90 214,108 215,50 217,130 219,100 222,90 225,100 "
-                   "240,100 260,100 290,100 320,100 360,100 400,100 440,100 480,100 560,100 600,100",
-                   "#f59e0b", "History of MI", "Residual Q-waves  |  T-wave inversion"),
-        "abnormal_heartbeat": (
-                   "0,100 10,100 12,95 14,100 18,100 19,90 20,60 21,140 22,100 23,110 26,100 "
-                   "40,100 41,90 42,65 43,130 44,100 45,108 48,100 "
-                   "55,100 58,100 60,93 61,65 62,135 63,100 64,106 68,100 "
-                   "80,100 82,100 84,93 85,60 86,138 87,100 88,106 92,100 "
-                   "100,100 108,100 110,93 111,70 112,128 113,100 114,106 118,100 "
-                   "130,100 140,100 142,93 143,60 144,140 145,100 146,108 150,100 "
-                   "160,100 170,100 172,93 173,55 174,145 175,100 176,110 180,100 "
-                   "195,100 200,100 202,93 203,65 204,132 205,100 206,107 210,100 "
-                   "230,100 240,100 250,100 270,100 300,100 340,100 380,100 420,100 480,100 560,100 600,100",
-                   "#a855f7", "Abnormal Heartbeat", "Irregular rhythm  |  Varying amplitudes")
     }
     
     path, color, label, desc = paths.get(sample_type, paths["normal"])
@@ -820,7 +802,7 @@ def main():
     rf_ready = preprocessor is not None and rf_model is not None
     vgg16_ready = vgg16_model is not None
     
-    # Initialize all session state variables (including preset triggers)
+    # Initialize all session state variables
     defaults = {
         'ecg_sample': None,
         'ecg_image': None,
@@ -938,7 +920,7 @@ def main():
     if not rf_ready:
         st.error("RF model not loaded. Predictions will fail. Check model download URLs.")
     if not vgg16_ready:
-        st.warning("VGG16 model not loaded. ECG predictions will fail. Demo samples will use placeholder results.")
+        st.warning("VGG16 model not loaded. ECG predictions (including demo samples) will fail.")
     
     # ========================================================================
     # TABS
@@ -1018,7 +1000,7 @@ def main():
                 fbs = st.toggle("Fasting Blood Sugar >120", key="dual_fbs_widget")
                 ex_angina = st.toggle("Exercise Induced Angina", key="dual_ex_angina_widget")
             
-            # Quick load buttons for dual mode
+            # Quick load buttons
             qc1, qc2 = st.columns(2)
             with qc1:
                 if st.button("Load Low Risk", width="stretch", key="dual_load_low"):
@@ -1044,9 +1026,15 @@ def main():
                         if st.session_state.ecg_image and vgg16_ready:
                             st.session_state.ecg_result = predict_ecg(st.session_state.ecg_image, vgg16_model)
                             st.session_state.dual_result = combine_results(st.session_state.rf_result, st.session_state.ecg_result)
-                        elif st.session_state.ecg_sample:
-                            st.session_state.ecg_result = simulate_ecg_for_demo()
-                            st.session_state.dual_result = combine_results(st.session_state.rf_result, st.session_state.ecg_result)
+                        elif st.session_state.ecg_sample and vgg16_ready:
+                            demo_image = fetch_demo_ecg(st.session_state.ecg_sample)
+                            if demo_image:
+                                st.session_state.ecg_result = predict_ecg(demo_image, vgg16_model)
+                                st.session_state.dual_result = combine_results(st.session_state.rf_result, st.session_state.ecg_result)
+                        elif not vgg16_ready and (st.session_state.ecg_image or st.session_state.ecg_sample):
+                            st.error("VGG16 model not loaded. Cannot classify ECG.")
+                            st.session_state.dual_result = combine_results(st.session_state.rf_result, None)
+                            st.session_state.ecg_result = None
                         else:
                             st.session_state.dual_result = combine_results(st.session_state.rf_result, None)
                             st.session_state.ecg_result = None
@@ -1056,8 +1044,8 @@ def main():
         with col2:
             st.markdown("#### ECG Image Scanner")
             
-            sample_options = [None, "normal", "myocardial_infarction", "history_mi", "abnormal_heartbeat"]
-            sample_labels = ["None", "Normal Sinus Rhythm", "Myocardial Infarction", "History of MI", "Abnormal Heartbeat"]
+            sample_options = [None, "normal", "myocardial_infarction"]
+            sample_labels = ["None", "Normal Sinus Rhythm", "Myocardial Infarction (STEMI)"]
             
             current_idx = sample_options.index(st.session_state.ecg_sample) if st.session_state.ecg_sample in sample_options else 0
             
@@ -1069,6 +1057,8 @@ def main():
                 st.session_state.ecg_image = None
                 svg = get_ecg_sample_svg(st.session_state.ecg_sample)
                 st.markdown(f'<div class="ecg-preview" style="margin:12px 0;">{svg}</div>', unsafe_allow_html=True)
+                if not vgg16_ready:
+                    st.warning("VGG16 model not loaded. Demo sample cannot be classified.")
             else:
                 st.session_state.ecg_sample = None
             
@@ -1077,6 +1067,8 @@ def main():
                 st.session_state.ecg_sample = None
                 st.session_state.ecg_image = base64.b64encode(uploaded_file.getvalue()).decode()
                 st.image(uploaded_file, caption="Uploaded ECG", width='stretch')
+                if not vgg16_ready:
+                    st.warning("VGG16 model not loaded. Uploaded ECG cannot be classified.")
             
             if not st.session_state.ecg_sample and not st.session_state.ecg_image:
                 st.info("No ECG selected — RF + SMOTE will still run on patient vitals. Select a sample or upload an ECG to enable dual-model triage.")
@@ -1199,18 +1191,18 @@ def main():
             pdf_download_button(pdf_data, "Download Clinical Report (PDF)")
     
     # ========================================================================
-    # TAB 2: ECG-ONLY
+    # TAB 2: ECG-ONLY (real model only)
     # ========================================================================
     
     with tab2:
         st.markdown("#### ECG Image Analysis")
-        st.caption("CNN VGG16 waveform classification from ECG images")
+        st.caption("CNN VGG16 waveform classification from ECG images — real model inference only")
         
         ec1, ec2 = st.columns([1, 1])
         
         with ec1:
-            sample_options = [None, "normal", "myocardial_infarction", "history_mi", "abnormal_heartbeat"]
-            sample_labels = ["None", "Normal Sinus Rhythm", "Myocardial Infarction", "History of MI", "Abnormal Heartbeat"]
+            sample_options = [None, "normal", "myocardial_infarction"]
+            sample_labels = ["None", "Normal Sinus Rhythm", "Myocardial Infarction (STEMI)"]
             
             current_idx = sample_options.index(st.session_state.ecg_sample) if st.session_state.ecg_sample in sample_options else 0
             
@@ -1222,6 +1214,8 @@ def main():
                 st.session_state.ecg_image = None
                 svg = get_ecg_sample_svg(st.session_state.ecg_sample)
                 st.markdown(f'<div class="ecg-preview" style="margin:12px 0;">{svg}</div>', unsafe_allow_html=True)
+                if not vgg16_ready:
+                    st.warning("VGG16 model not loaded. Demo sample cannot be classified.")
             else:
                 st.session_state.ecg_sample = None
             
@@ -1232,9 +1226,11 @@ def main():
                 st.session_state.ecg_sample = None
                 st.session_state.ecg_image = base64.b64encode(uploaded_file.getvalue()).decode()
                 st.image(uploaded_file, caption="Uploaded ECG", width='stretch')
+                if not vgg16_ready:
+                    st.warning("VGG16 model not loaded. Uploaded ECG cannot be classified.")
             
             has_ecg = bool(st.session_state.ecg_sample or st.session_state.ecg_image)
-            can_analyze = has_ecg and (vgg16_ready or st.session_state.ecg_sample)
+            can_analyze = has_ecg and vgg16_ready
             
             if st.button("Analyze ECG", type="primary", width="stretch", disabled=not can_analyze, key="ecg_only_analyze"):
                 if st.session_state.ecg_image and vgg16_ready:
@@ -1244,8 +1240,15 @@ def main():
                             st.session_state.ecg_result = predict_ecg(st.session_state.ecg_image, vgg16_model)
                         except Exception as e:
                             st.error(f"ECG prediction failed: {e}")
-                elif st.session_state.ecg_sample:
-                    st.session_state.ecg_result = simulate_ecg_for_demo()
+                elif st.session_state.ecg_sample and vgg16_ready:
+                    with st.spinner("Fetching demo ECG and running CNN VGG16..."):
+                        time.sleep(0.5)
+                        demo_image = fetch_demo_ecg(st.session_state.ecg_sample)
+                        if demo_image:
+                            try:
+                                st.session_state.ecg_result = predict_ecg(demo_image, vgg16_model)
+                            except Exception as e:
+                                st.error(f"ECG prediction failed: {e}")
         
         with ec2:
             if st.session_state.ecg_result:
@@ -1303,7 +1306,7 @@ def main():
                 """, unsafe_allow_html=True)
     
     # ========================================================================
-    # TAB 3: DATA-ONLY (preset trigger pattern)
+    # TAB 3: DATA-ONLY
     # ========================================================================
     
     with tab3:
@@ -1315,7 +1318,7 @@ def main():
         with dc1:
             patient_name = st.text_input("Patient ID / Name", key="data_patient_name")
             
-            # Apply preset BEFORE widgets render (after st.rerun from button click)
+            # Apply preset BEFORE widgets render
             if st.session_state.get('data_preset') == 'low':
                 st.session_state.data_age_widget = 40
                 st.session_state.data_sex_widget = 1
@@ -1328,7 +1331,7 @@ def main():
                 st.session_state.data_ex_angina_widget = False
                 st.session_state.data_oldpeak_widget = 0.0
                 st.session_state.data_st_slope_widget = 1
-                st.session_state.data_preset = None  # Clear trigger
+                st.session_state.data_preset = None
             elif st.session_state.get('data_preset') == 'high':
                 st.session_state.data_age_widget = 49
                 st.session_state.data_sex_widget = 0
@@ -1341,7 +1344,7 @@ def main():
                 st.session_state.data_ex_angina_widget = False
                 st.session_state.data_oldpeak_widget = 1.0
                 st.session_state.data_st_slope_widget = 2
-                st.session_state.data_preset = None  # Clear trigger
+                st.session_state.data_preset = None
             
             fc1, fc2 = st.columns(2)
             with fc1:
@@ -1361,7 +1364,6 @@ def main():
                 fbs = st.toggle("Fasting Blood Sugar >120", key="data_fbs_widget")
                 ex_angina = st.toggle("Exercise Induced Angina", key="data_ex_angina_widget")
             
-            # Quick load buttons — set trigger, then rerun
             qc1, qc2 = st.columns(2)
             with qc1:
                 if st.button("Load Low Risk Sample", width="stretch", key="data_load_low"):
