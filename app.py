@@ -820,8 +820,7 @@ def main():
     rf_ready = preprocessor is not None and rf_model is not None
     vgg16_ready = vgg16_model is not None
     
-    # Initialize all session state variables
-    # Using the widget key names so presets directly update the widgets
+    # Initialize all session state variables (including preset triggers)
     defaults = {
         'ecg_sample': None,
         'ecg_image': None,
@@ -829,7 +828,7 @@ def main():
         'ecg_result': None,
         'dual_result': None,
         'data_rf_result': None,
-        # Data-only form field widget keys
+        # Data-only form widget keys
         'data_age_widget': 45,
         'data_sex_widget': 1,
         'data_chest_pain_widget': 2,
@@ -841,7 +840,7 @@ def main():
         'data_ex_angina_widget': False,
         'data_oldpeak_widget': 0.0,
         'data_st_slope_widget': 1,
-        # Dual mode form field widget keys
+        # Dual mode form widget keys
         'dual_age_widget': 45,
         'dual_sex_widget': 1,
         'dual_chest_pain_widget': 2,
@@ -853,6 +852,9 @@ def main():
         'dual_ex_angina_widget': False,
         'dual_oldpeak_widget': 0.0,
         'dual_st_slope_widget': 1,
+        # Preset triggers
+        'data_preset': None,
+        'dual_preset': None,
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -970,6 +972,34 @@ def main():
             st.markdown("#### Patient Vitals")
             patient_name = st.text_input("Patient ID / Name", key="dual_patient_name")
             
+            # Apply dual preset BEFORE widgets render
+            if st.session_state.get('dual_preset') == 'low':
+                st.session_state.dual_age_widget = 40
+                st.session_state.dual_sex_widget = 1
+                st.session_state.dual_chest_pain_widget = 2
+                st.session_state.dual_resting_bp_widget = 140
+                st.session_state.dual_cholesterol_widget = 289
+                st.session_state.dual_fbs_widget = False
+                st.session_state.dual_resting_ecg_widget = 0
+                st.session_state.dual_max_hr_widget = 172
+                st.session_state.dual_ex_angina_widget = False
+                st.session_state.dual_oldpeak_widget = 0.0
+                st.session_state.dual_st_slope_widget = 1
+                st.session_state.dual_preset = None
+            elif st.session_state.get('dual_preset') == 'high':
+                st.session_state.dual_age_widget = 49
+                st.session_state.dual_sex_widget = 0
+                st.session_state.dual_chest_pain_widget = 3
+                st.session_state.dual_resting_bp_widget = 160
+                st.session_state.dual_cholesterol_widget = 180
+                st.session_state.dual_fbs_widget = False
+                st.session_state.dual_resting_ecg_widget = 0
+                st.session_state.dual_max_hr_widget = 156
+                st.session_state.dual_ex_angina_widget = False
+                st.session_state.dual_oldpeak_widget = 1.0
+                st.session_state.dual_st_slope_widget = 2
+                st.session_state.dual_preset = None
+            
             fc1, fc2 = st.columns(2)
             with fc1:
                 age = st.number_input("Age (years)", 18, 100, key="dual_age_widget")
@@ -987,6 +1017,17 @@ def main():
                     format_func=lambda x: {1:"1 — Upsloping", 2:"2 — Flat", 3:"3 — Downsloping"}[x], key="dual_st_slope_widget")
                 fbs = st.toggle("Fasting Blood Sugar >120", key="dual_fbs_widget")
                 ex_angina = st.toggle("Exercise Induced Angina", key="dual_ex_angina_widget")
+            
+            # Quick load buttons for dual mode
+            qc1, qc2 = st.columns(2)
+            with qc1:
+                if st.button("Load Low Risk", width="stretch", key="dual_load_low"):
+                    st.session_state.dual_preset = "low"
+                    st.rerun()
+            with qc2:
+                if st.button("Load High Risk", width="stretch", key="dual_load_high"):
+                    st.session_state.dual_preset = "high"
+                    st.rerun()
             
             if st.button("Analyze Patient Data", type="primary", width="stretch", key="dual_analyze_btn", disabled=not rf_ready):
                 patient_data = {
@@ -1262,7 +1303,7 @@ def main():
                 """, unsafe_allow_html=True)
     
     # ========================================================================
-    # TAB 3: DATA-ONLY (presets write directly to widget keys)
+    # TAB 3: DATA-ONLY (preset trigger pattern)
     # ========================================================================
     
     with tab3:
@@ -1273,6 +1314,34 @@ def main():
         
         with dc1:
             patient_name = st.text_input("Patient ID / Name", key="data_patient_name")
+            
+            # Apply preset BEFORE widgets render (after st.rerun from button click)
+            if st.session_state.get('data_preset') == 'low':
+                st.session_state.data_age_widget = 40
+                st.session_state.data_sex_widget = 1
+                st.session_state.data_chest_pain_widget = 2
+                st.session_state.data_resting_bp_widget = 140
+                st.session_state.data_cholesterol_widget = 289
+                st.session_state.data_fbs_widget = False
+                st.session_state.data_resting_ecg_widget = 0
+                st.session_state.data_max_hr_widget = 172
+                st.session_state.data_ex_angina_widget = False
+                st.session_state.data_oldpeak_widget = 0.0
+                st.session_state.data_st_slope_widget = 1
+                st.session_state.data_preset = None  # Clear trigger
+            elif st.session_state.get('data_preset') == 'high':
+                st.session_state.data_age_widget = 49
+                st.session_state.data_sex_widget = 0
+                st.session_state.data_chest_pain_widget = 3
+                st.session_state.data_resting_bp_widget = 160
+                st.session_state.data_cholesterol_widget = 180
+                st.session_state.data_fbs_widget = False
+                st.session_state.data_resting_ecg_widget = 0
+                st.session_state.data_max_hr_widget = 156
+                st.session_state.data_ex_angina_widget = False
+                st.session_state.data_oldpeak_widget = 1.0
+                st.session_state.data_st_slope_widget = 2
+                st.session_state.data_preset = None  # Clear trigger
             
             fc1, fc2 = st.columns(2)
             with fc1:
@@ -1292,41 +1361,15 @@ def main():
                 fbs = st.toggle("Fasting Blood Sugar >120", key="data_fbs_widget")
                 ex_angina = st.toggle("Exercise Induced Angina", key="data_ex_angina_widget")
             
-            # Quick load buttons — write directly to widget keys
+            # Quick load buttons — set trigger, then rerun
             qc1, qc2 = st.columns(2)
             with qc1:
                 if st.button("Load Low Risk Sample", width="stretch", key="data_load_low"):
-                    # Low risk: Age 40, Sex 1 (Male), Chest pain type 2 (Atypical Angina),
-                    # Resting bp 140, Cholesterol 289, FBS 0, Resting ECG 0 (Normal),
-                    # Max HR 172, Exercise angina 0, Oldpeak 0.0, ST slope 1 (Upsloping), Target 0
-                    st.session_state.data_age_widget = 40
-                    st.session_state.data_sex_widget = 1
-                    st.session_state.data_chest_pain_widget = 2
-                    st.session_state.data_resting_bp_widget = 140
-                    st.session_state.data_cholesterol_widget = 289
-                    st.session_state.data_fbs_widget = False
-                    st.session_state.data_resting_ecg_widget = 0
-                    st.session_state.data_max_hr_widget = 172
-                    st.session_state.data_ex_angina_widget = False
-                    st.session_state.data_oldpeak_widget = 0.0
-                    st.session_state.data_st_slope_widget = 1
+                    st.session_state.data_preset = "low"
                     st.rerun()
             with qc2:
                 if st.button("Load High Risk Sample", width="stretch", key="data_load_high"):
-                    # High risk: Age 49, Sex 0 (Female), Chest pain type 3 (Non-Anginal),
-                    # Resting bp 160, Cholesterol 180, FBS 0, Resting ECG 0 (Normal),
-                    # Max HR 156, Exercise angina 0, Oldpeak 1.0, ST slope 2 (Flat), Target 1
-                    st.session_state.data_age_widget = 49
-                    st.session_state.data_sex_widget = 0
-                    st.session_state.data_chest_pain_widget = 3
-                    st.session_state.data_resting_bp_widget = 160
-                    st.session_state.data_cholesterol_widget = 180
-                    st.session_state.data_fbs_widget = False
-                    st.session_state.data_resting_ecg_widget = 0
-                    st.session_state.data_max_hr_widget = 156
-                    st.session_state.data_ex_angina_widget = False
-                    st.session_state.data_oldpeak_widget = 1.0
-                    st.session_state.data_st_slope_widget = 2
+                    st.session_state.data_preset = "high"
                     st.rerun()
             
             if st.button("Analyze Patient Data", type="primary", width="stretch", key="data_analyze_btn", disabled=not rf_ready):
