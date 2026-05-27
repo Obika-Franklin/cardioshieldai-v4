@@ -12,7 +12,7 @@ import base64
 import time
 from PIL import Image
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import plotly.graph_objects as go
 import plotly.express as px
 from pathlib import Path
@@ -56,7 +56,6 @@ def inject_custom_css():
             background-color: #F7F9FC;
         }
         
-        /* Hide Streamlit default elements without negative margins */
         div[data-testid="stToolbar"] {
             display: none;
         }
@@ -204,7 +203,6 @@ def inject_custom_css():
         }
 
         /* Primary action button */
-        .stButton > button.primary-btn, 
         button[kind="primary"] {
             background: linear-gradient(135deg, #0B1F3A 0%, #122b4d 100%) !important;
             color: white !important;
@@ -216,30 +214,9 @@ def inject_custom_css():
             box-shadow: 0 2px 8px rgba(11, 31, 58, 0.2) !important;
         }
         
-        .stButton > button.primary-btn:hover,
         button[kind="primary"]:hover {
             transform: translateY(-1px) !important;
             box-shadow: 0 4px 16px rgba(11, 31, 58, 0.3) !important;
-        }
-        
-        /* Secondary/preset buttons */
-        .stButton > button.secondary-btn {
-            background: #FFFFFF !important;
-            color: #4B5563 !important;
-            border: 1px solid #E2E8F0 !important;
-            border-radius: 12px !important;
-            padding: 0.5rem 1rem !important;
-            font-weight: 600 !important;
-            font-size: 0.8rem !important;
-            transition: all 0.2s !important;
-            box-shadow: none !important;
-        }
-        
-        .stButton > button.secondary-btn:hover {
-            background: #F7F9FC !important;
-            border-color: #9CA3AF !important;
-            transform: none !important;
-            box-shadow: none !important;
         }
         
         .investor-card {
@@ -336,7 +313,7 @@ def inject_custom_css():
             margin-top: 16px;
             padding: 12px;
             background: #0B1F3A;
-            color: white;
+            color: #FFFFFF !important;
             border: none;
             border-radius: 12px;
             font-weight: 700;
@@ -707,7 +684,7 @@ def risk_badge_html(level):
     return badges.get(level, badges["low"])
 
 # ============================================================================
-# PDF GENERATION
+# PDF GENERATION (Real PDF via reportlab)
 # ============================================================================
 
 from reportlab.lib.pagesizes import A4
@@ -716,14 +693,11 @@ from reportlab.lib.colors import HexColor, white, black
 from reportlab.lib.units import mm, cm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-from reportlab.platypus.flowables import HRFlowable
-import tempfile
 
 def generate_pdf_bytes(data):
     """Generate a real PDF report and return as bytes"""
     buffer = BytesIO()
     
-    # Document setup
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
@@ -733,83 +707,51 @@ def generate_pdf_bytes(data):
         bottomMargin=20*mm
     )
     
-    # Styles
     styles = getSampleStyleSheet()
     
     title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Title'],
-        fontSize=22,
-        textColor=HexColor('#001F3F'),
-        spaceAfter=2*mm,
+        'CustomTitle', parent=styles['Title'],
+        fontSize=22, textColor=HexColor('#001F3F'), spaceAfter=2*mm,
         fontName='Helvetica-Bold'
     )
     
     subtitle_style = ParagraphStyle(
-        'CustomSubtitle',
-        parent=styles['Normal'],
-        fontSize=10,
-        textColor=HexColor('#1A9E91'),
-        fontName='Helvetica-Bold',
-        spaceAfter=10*mm,
-        letterSpacing=1
+        'CustomSubtitle', parent=styles['Normal'],
+        fontSize=10, textColor=HexColor('#1A9E91'), fontName='Helvetica-Bold',
+        spaceAfter=10*mm, letterSpacing=1
     )
     
     heading_style = ParagraphStyle(
-        'CustomHeading',
-        parent=styles['Heading2'],
-        fontSize=13,
-        textColor=HexColor('#001F3F'),
-        fontName='Helvetica-Bold',
-        spaceBefore=8*mm,
-        spaceAfter=4*mm,
-        textTransform='uppercase'
+        'CustomHeading', parent=styles['Heading2'],
+        fontSize=13, textColor=HexColor('#001F3F'), fontName='Helvetica-Bold',
+        spaceBefore=8*mm, spaceAfter=4*mm, textTransform='uppercase'
     )
     
     body_style = ParagraphStyle(
-        'CustomBody',
-        parent=styles['Normal'],
-        fontSize=10,
-        textColor=HexColor('#424242'),
-        fontName='Helvetica',
-        leading=16,
-        spaceAfter=4*mm
+        'CustomBody', parent=styles['Normal'],
+        fontSize=10, textColor=HexColor('#424242'), fontName='Helvetica',
+        leading=16, spaceAfter=4*mm
     )
     
     badge_style = ParagraphStyle(
-        'Badge',
-        parent=styles['Normal'],
-        fontSize=9,
-        textColor=white,
-        fontName='Helvetica-Bold',
-        leading=14
+        'Badge', parent=styles['Normal'],
+        fontSize=9, textColor=white, fontName='Helvetica-Bold', leading=14
     )
     
     disclaimer_style = ParagraphStyle(
-        'Disclaimer',
-        parent=styles['Normal'],
-        fontSize=8,
-        textColor=HexColor('#5D4037'),
-        fontName='Helvetica',
-        leading=12,
-        backColor=HexColor('#FFF3E0'),
-        borderPadding=10,
-        borderWidth=0,
-        borderColor=HexColor('#B45309'),
-        borderLeftWidth=4,
-        spaceBefore=10*mm
+        'Disclaimer', parent=styles['Normal'],
+        fontSize=8, textColor=HexColor('#5D4037'), fontName='Helvetica',
+        leading=12, backColor=HexColor('#FFF3E0'),
+        borderPadding=10, borderWidth=0,
+        borderColor=HexColor('#B45309'), borderLeftWidth=4, spaceBefore=10*mm
     )
     
     footer_style = ParagraphStyle(
-        'Footer',
-        parent=styles['Normal'],
-        fontSize=7,
-        textColor=HexColor('#9E9E9E'),
-        fontName='Helvetica',
+        'Footer', parent=styles['Normal'],
+        fontSize=7, textColor=HexColor('#9E9E9E'), fontName='Helvetica',
         alignment=TA_CENTER
     )
     
-    # Risk colors
     risk_colors = {
         "high": HexColor('#DC2626'),
         "moderate": HexColor('#B45309'),
@@ -828,11 +770,12 @@ def generate_pdf_bytes(data):
         "data": "Data-Only Mode (RF + SMOTE)"
     }
     
-    now = datetime.now()
-    date_str = now.strftime("%B %d, %Y, %I:%M %p")
+    # WAT timezone
+    WAT = timezone(timedelta(hours=1))
+    now = datetime.now(WAT)
+    date_str = now.strftime("%B %d, %Y, %I:%M %p WAT")
     report_id = f"CSR-{now.strftime('%Y%m%d%H%M%S')}"
     
-    # Build story
     story = []
     
     # Header
@@ -891,7 +834,6 @@ def generate_pdf_bytes(data):
         
         story.append(Paragraph(rf["recommendation"], body_style))
         
-        # Feature importance
         if rf.get("features"):
             story.append(Paragraph("<b>Top Feature Importances</b>", ParagraphStyle('SubHeading', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=HexColor('#001F3F'), spaceBefore=4*mm)))
             
@@ -975,7 +917,6 @@ def generate_pdf_bytes(data):
         footer_style
     ))
     
-    # Build PDF
     doc.build(story)
     buffer.seek(0)
     return buffer.getvalue()
@@ -1055,8 +996,8 @@ def main():
     header_shield = icon("fa-shield-halved", "24px", "#fff")
     header_bolt = icon("fa-bolt", "", "#1A9E91")
     header_chart = icon("fa-chart-line", "", "#1A9E91")
-    header_clock = icon("fa-stopwatch", "", "#1A9E91")
-    header_db = icon("fa-database", "", "#1A9E91")
+    header_brain = icon("fa-brain", "", "#1A9E91")
+    header_bullseye = icon("fa-bullseye", "", "#1A9E91")
     
     rf_status_class = "model-status-loaded" if rf_ready else "model-status-missing"
     rf_status_text = "RF LOADED" if rf_ready else "RF MISSING"
@@ -1096,26 +1037,26 @@ def main():
                 <div style="display:flex;align-items:center;gap:10px;">
                     <div style="padding:8px;background:rgba(26,158,145,0.15);border-radius:8px;">{header_chart}</div>
                     <div>
-                        <p style="color:white;font-weight:700;margin:0;font-size:0.85rem;">VGG16 ECG</p>
+                        <p style="color:white;font-weight:700;margin:0;font-size:0.85rem;">CNN VGG16</p>
                         <p style="color:rgba(255,255,255,0.5);margin:0;font-size:0.7rem;">2,500 ECG images</p>
                     </div>
                 </div>
             </div>
             <div class="kpi-card" style="flex:1;min-width:150px;">
                 <div style="display:flex;align-items:center;gap:10px;">
-                    <div style="padding:8px;background:rgba(26,158,145,0.15);border-radius:8px;">{header_clock}</div>
+                    <div style="padding:8px;background:rgba(26,158,145,0.15);border-radius:8px;">{header_brain}</div>
                     <div>
-                        <p style="color:white;font-weight:700;margin:0;font-size:0.85rem;">Rapid</p>
-                        <p style="color:rgba(255,255,255,0.5);margin:0;font-size:0.7rem;">Inference response time</p>
+                        <p style="color:white;font-weight:700;margin:0;font-size:0.85rem;">86% Avg Recall</p>
+                        <p style="color:rgba(255,255,255,0.5);margin:0;font-size:0.7rem;">CNN VGG16 sensitivity</p>
                     </div>
                 </div>
             </div>
             <div class="kpi-card" style="flex:1;min-width:150px;">
                 <div style="display:flex;align-items:center;gap:10px;">
-                    <div style="padding:8px;background:rgba(26,158,145,0.15);border-radius:8px;">{header_db}</div>
+                    <div style="padding:8px;background:rgba(26,158,145,0.15);border-radius:8px;">{header_bullseye}</div>
                     <div>
-                        <p style="color:white;font-weight:700;margin:0;font-size:0.85rem;">94% Recall</p>
-                        <p style="color:rgba(255,255,255,0.5);margin:0;font-size:0.7rem;">RF+SMOTE sensitivity</p>
+                        <p style="color:white;font-weight:700;margin:0;font-size:0.85rem;">94% Avg Recall</p>
+                        <p style="color:rgba(255,255,255,0.5);margin:0;font-size:0.7rem;">RF + SMOTE sensitivity</p>
                     </div>
                 </div>
             </div>
@@ -1165,8 +1106,8 @@ def main():
                     st.session_state.dual_age_widget = 40
                     st.session_state.dual_sex_widget = 1
                     st.session_state.dual_chest_pain_widget = 2
-                    st.session_state.dual_resting_bp_widget = 140
-                    st.session_state.dual_cholesterol_widget = 289
+                    st.session_state.dual_resting_bp_widget = 120
+                    st.session_state.dual_cholesterol_widget = 185
                     st.session_state.dual_fbs_widget = False
                     st.session_state.dual_resting_ecg_widget = 0
                     st.session_state.dual_max_hr_widget = 172
@@ -1175,16 +1116,16 @@ def main():
                     st.session_state.dual_st_slope_widget = 1
                     st.session_state.dual_preset = None
                 elif st.session_state.get('dual_preset') == 'high':
-                    st.session_state.dual_age_widget = 48
-                    st.session_state.dual_sex_widget = 0
+                    st.session_state.dual_age_widget = 62
+                    st.session_state.dual_sex_widget = 1
                     st.session_state.dual_chest_pain_widget = 4
-                    st.session_state.dual_resting_bp_widget = 138
-                    st.session_state.dual_cholesterol_widget = 214
-                    st.session_state.dual_fbs_widget = False
-                    st.session_state.dual_resting_ecg_widget = 0
-                    st.session_state.dual_max_hr_widget = 108
+                    st.session_state.dual_resting_bp_widget = 160
+                    st.session_state.dual_cholesterol_widget = 280
+                    st.session_state.dual_fbs_widget = True
+                    st.session_state.dual_resting_ecg_widget = 1
+                    st.session_state.dual_max_hr_widget = 118
                     st.session_state.dual_ex_angina_widget = True
-                    st.session_state.dual_oldpeak_widget = 1.5
+                    st.session_state.dual_oldpeak_widget = 2.4
                     st.session_state.dual_st_slope_widget = 2
                     st.session_state.dual_preset = None
                 
@@ -1216,7 +1157,10 @@ def main():
                         st.session_state.dual_preset = "high"
                         st.rerun()
                 
-                if st.button("Analyze Patient Data", type="primary", width="stretch", key="dual_analyze_btn", disabled=not rf_ready):
+                has_ecg_input = bool(st.session_state.ecg_sample or st.session_state.ecg_image)
+                dual_disabled = not rf_ready or not has_ecg_input
+                
+                if st.button("Analyze Patient Data", type="primary", width="stretch", key="dual_analyze_btn", disabled=dual_disabled):
                     patient_data = {
                         "patientName": patient_name, "age": age, "sex": sex,
                         "chestPainType": chest_pain, "restingBpS": resting_bp,
@@ -1245,6 +1189,9 @@ def main():
                                 st.session_state.ecg_result = None
                         except Exception as e:
                             st.error(f"Prediction failed: {e}")
+                
+                if not has_ecg_input:
+                    st.warning("Please select a demo ECG sample or upload an ECG image before analysis.")
         
         with col2:
             with st.container(border=True):
@@ -1552,8 +1499,8 @@ def main():
                     st.session_state.data_age_widget = 40
                     st.session_state.data_sex_widget = 1
                     st.session_state.data_chest_pain_widget = 2
-                    st.session_state.data_resting_bp_widget = 140
-                    st.session_state.data_cholesterol_widget = 289
+                    st.session_state.data_resting_bp_widget = 120
+                    st.session_state.data_cholesterol_widget = 185
                     st.session_state.data_fbs_widget = False
                     st.session_state.data_resting_ecg_widget = 0
                     st.session_state.data_max_hr_widget = 172
@@ -1562,16 +1509,16 @@ def main():
                     st.session_state.data_st_slope_widget = 1
                     st.session_state.data_preset = None
                 elif st.session_state.get('data_preset') == 'high':
-                    st.session_state.data_age_widget = 48
-                    st.session_state.data_sex_widget = 0
+                    st.session_state.data_age_widget = 62
+                    st.session_state.data_sex_widget = 1
                     st.session_state.data_chest_pain_widget = 4
-                    st.session_state.data_resting_bp_widget = 138
-                    st.session_state.data_cholesterol_widget = 214
-                    st.session_state.data_fbs_widget = False
-                    st.session_state.data_resting_ecg_widget = 0
-                    st.session_state.data_max_hr_widget = 108
+                    st.session_state.data_resting_bp_widget = 160
+                    st.session_state.data_cholesterol_widget = 280
+                    st.session_state.data_fbs_widget = True
+                    st.session_state.data_resting_ecg_widget = 1
+                    st.session_state.data_max_hr_widget = 118
                     st.session_state.data_ex_angina_widget = True
-                    st.session_state.data_oldpeak_widget = 1.5
+                    st.session_state.data_oldpeak_widget = 2.4
                     st.session_state.data_st_slope_widget = 2
                     st.session_state.data_preset = None
                 
@@ -1670,8 +1617,8 @@ def main():
         
         cols = st.columns(4)
         stats = [
-            ("91%", "RF+SMOTE Accuracy", "1,200 patient records"),
-            ("94%", "Recall (Sensitivity)", "Heart disease detection"),
+            ("94%", "Avg Recall (RF + SMOTE)", "Heart disease detection"),
+            ("86%", "Avg Recall (CNN VGG16)", "ECG classification"),
             ("< 2s", "Inference Time", "Per prediction"),
             ("$4B+", "Addressable Market", "Global CDS software")
         ]
@@ -1722,7 +1669,7 @@ def main():
                         <div style="width:24px;height:24px;background:#0B1F3A;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;flex-shrink:0;">1</div>
                         <div>
                             <p style="font-weight:700;color:#1F2937;font-size:0.8rem;text-transform:uppercase;">Phase 1 — Structured Vitals</p>
-                            <p style="color:#6B7280;font-size:0.8rem;">Random Forest + SMOTE on 11 clinical features. No ECG required. 91% accuracy on 1,200 records. Deployable in any clinic globally.</p>
+                            <p style="color:#6B7280;font-size:0.8rem;">Random Forest + SMOTE on 11 clinical features. No ECG required. 94% average recall on 1,200 records. Deployable in any clinic globally.</p>
                         </div>
                     </div>
                     <div style="display:flex;gap:12px;">
