@@ -292,26 +292,6 @@ def inject_custom_css():
             border: 1px solid #FECACA;
         }
         
-        /* Loading overlay */
-        .loading-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 3rem;
-            text-align: center;
-        }
-        
-        .loading-spinner {
-            width: 48px;
-            height: 48px;
-            border: 4px solid #E2E8F0;
-            border-top: 4px solid #2EC4B6;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 16px;
-        }
-        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -400,7 +380,6 @@ def get_aggregated_feature_importance(rf_model, preprocessor):
         raw_importances = rf_model.feature_importances_
         n_features = len(raw_importances)
         
-        # The 11 original feature names (with spaces, matching the preprocessor)
         feature_names = ['age', 'sex', 'chest pain type', 'resting bp s', 'cholesterol',
                        'fasting blood sugar', 'resting ecg', 'max heart rate',
                        'exercise angina', 'oldpeak', 'ST slope']
@@ -409,9 +388,7 @@ def get_aggregated_feature_importance(rf_model, preprocessor):
             return {name: float(imp) for name, imp in zip(feature_names, raw_importances)}
         
         elif n_features > 11:
-            # Post-OHE: aggregate back to originals
             ohe_names = preprocessor.get_feature_names_out()
-            
             feature_groups = {name: [name] for name in feature_names}
             
             aggregated = {}
@@ -465,13 +442,6 @@ def get_waitlist_count():
 # ============================================================================
 # INFERENCE (NO SIMULATION FALLBACKS)
 # ============================================================================
-
-# Preprocessor expected column names (from replit.md)
-PREPROCESSOR_COLUMNS = [
-    'age', 'sex', 'chest pain type', 'resting bp s', 'cholesterol',
-    'fasting blood sugar', 'resting ecg', 'max heart rate',
-    'exercise angina', 'oldpeak', 'ST slope'
-]
 
 def predict_rf(patient_data, preprocessor, rf_model):
     """RF prediction — requires models to be loaded"""
@@ -851,6 +821,7 @@ def main():
     vgg16_ready = vgg16_model is not None
     
     # Initialize all session state variables
+    # Using the widget key names so presets directly update the widgets
     defaults = {
         'ecg_sample': None,
         'ecg_image': None,
@@ -858,30 +829,30 @@ def main():
         'ecg_result': None,
         'dual_result': None,
         'data_rf_result': None,
-        # Data-only form field values (for preset loading)
-        'data_age': 45,
-        'data_sex': 1,
-        'data_chest_pain': 2,
-        'data_resting_bp': 130,
-        'data_cholesterol': 220,
-        'data_fbs': False,
-        'data_resting_ecg': 0,
-        'data_max_hr': 150,
-        'data_ex_angina': False,
-        'data_oldpeak': 0.0,
-        'data_st_slope': 1,
-        # Dual mode form field values
-        'dual_age': 45,
-        'dual_sex': 1,
-        'dual_chest_pain': 2,
-        'dual_resting_bp': 130,
-        'dual_cholesterol': 220,
-        'dual_fbs': False,
-        'dual_resting_ecg': 0,
-        'dual_max_hr': 150,
-        'dual_ex_angina': False,
-        'dual_oldpeak': 0.0,
-        'dual_st_slope': 1,
+        # Data-only form field widget keys
+        'data_age_widget': 45,
+        'data_sex_widget': 1,
+        'data_chest_pain_widget': 2,
+        'data_resting_bp_widget': 130,
+        'data_cholesterol_widget': 220,
+        'data_fbs_widget': False,
+        'data_resting_ecg_widget': 0,
+        'data_max_hr_widget': 150,
+        'data_ex_angina_widget': False,
+        'data_oldpeak_widget': 0.0,
+        'data_st_slope_widget': 1,
+        # Dual mode form field widget keys
+        'dual_age_widget': 45,
+        'dual_sex_widget': 1,
+        'dual_chest_pain_widget': 2,
+        'dual_resting_bp_widget': 130,
+        'dual_cholesterol_widget': 220,
+        'dual_fbs_widget': False,
+        'dual_resting_ecg_widget': 0,
+        'dual_max_hr_widget': 150,
+        'dual_ex_angina_widget': False,
+        'dual_oldpeak_widget': 0.0,
+        'dual_st_slope_widget': 1,
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -1001,21 +972,21 @@ def main():
             
             fc1, fc2 = st.columns(2)
             with fc1:
-                age = st.number_input("Age (years)", 18, 100, value=st.session_state.dual_age, key="dual_age_widget")
-                resting_bp = st.number_input("Resting BP (mmHg)", 60, 250, value=st.session_state.dual_resting_bp, key="dual_resting_bp_widget")
-                cholesterol = st.number_input("Cholesterol (mg/dl)", 0, 700, value=st.session_state.dual_cholesterol, key="dual_cholesterol_widget")
-                max_hr = st.number_input("Max Heart Rate (bpm)", 50, 250, value=st.session_state.dual_max_hr, key="dual_max_hr_widget")
-                oldpeak = st.number_input("ST Depression (Oldpeak)", -3.0, 7.0, value=st.session_state.dual_oldpeak, step=0.1, key="dual_oldpeak_widget")
+                age = st.number_input("Age (years)", 18, 100, key="dual_age_widget")
+                resting_bp = st.number_input("Resting BP (mmHg)", 60, 250, key="dual_resting_bp_widget")
+                cholesterol = st.number_input("Cholesterol (mg/dl)", 0, 700, key="dual_cholesterol_widget")
+                max_hr = st.number_input("Max Heart Rate (bpm)", 50, 250, key="dual_max_hr_widget")
+                oldpeak = st.number_input("ST Depression (Oldpeak)", -3.0, 7.0, step=0.1, key="dual_oldpeak_widget")
             with fc2:
-                sex = st.selectbox("Sex", [1, 0], format_func=lambda x: "Male" if x == 1 else "Female", index=0 if st.session_state.dual_sex == 1 else 1, key="dual_sex_widget")
+                sex = st.selectbox("Sex", [1, 0], format_func=lambda x: "Male" if x == 1 else "Female", key="dual_sex_widget")
                 chest_pain = st.selectbox("Chest Pain Type", [1, 2, 3, 4],
-                    format_func=lambda x: {1:"1 — Typical Angina", 2:"2 — Atypical Angina", 3:"3 — Non-Anginal", 4:"4 — Asymptomatic"}[x], index=st.session_state.dual_chest_pain-1, key="dual_chest_pain_widget")
+                    format_func=lambda x: {1:"1 — Typical Angina", 2:"2 — Atypical Angina", 3:"3 — Non-Anginal", 4:"4 — Asymptomatic"}[x], key="dual_chest_pain_widget")
                 resting_ecg = st.selectbox("Resting ECG", [0, 1, 2],
-                    format_func=lambda x: {0:"0 — Normal", 1:"1 — ST-T Wave", 2:"2 — LV Hypertrophy"}[x], index=st.session_state.dual_resting_ecg, key="dual_resting_ecg_widget")
+                    format_func=lambda x: {0:"0 — Normal", 1:"1 — ST-T Wave", 2:"2 — LV Hypertrophy"}[x], key="dual_resting_ecg_widget")
                 st_slope = st.selectbox("ST Slope", [1, 2, 3],
-                    format_func=lambda x: {1:"1 — Upsloping", 2:"2 — Flat", 3:"3 — Downsloping"}[x], index=st.session_state.dual_st_slope-1, key="dual_st_slope_widget")
-                fbs = st.toggle("Fasting Blood Sugar >120", value=st.session_state.dual_fbs, key="dual_fbs_widget")
-                ex_angina = st.toggle("Exercise Induced Angina", value=st.session_state.dual_ex_angina, key="dual_ex_angina_widget")
+                    format_func=lambda x: {1:"1 — Upsloping", 2:"2 — Flat", 3:"3 — Downsloping"}[x], key="dual_st_slope_widget")
+                fbs = st.toggle("Fasting Blood Sugar >120", key="dual_fbs_widget")
+                ex_angina = st.toggle("Exercise Induced Angina", key="dual_ex_angina_widget")
             
             if st.button("Analyze Patient Data", type="primary", width="stretch", key="dual_analyze_btn", disabled=not rf_ready):
                 patient_data = {
@@ -1291,7 +1262,7 @@ def main():
                 """, unsafe_allow_html=True)
     
     # ========================================================================
-    # TAB 3: DATA-ONLY (with session state presets and correct column names)
+    # TAB 3: DATA-ONLY (presets write directly to widget keys)
     # ========================================================================
     
     with tab3:
@@ -1305,57 +1276,57 @@ def main():
             
             fc1, fc2 = st.columns(2)
             with fc1:
-                age = st.number_input("Age (years)", 18, 100, value=st.session_state.data_age, key="data_age_widget")
-                resting_bp = st.number_input("Resting BP (mmHg)", 60, 250, value=st.session_state.data_resting_bp, key="data_resting_bp_widget")
-                cholesterol = st.number_input("Cholesterol (mg/dl)", 0, 700, value=st.session_state.data_cholesterol, key="data_cholesterol_widget")
-                max_hr = st.number_input("Max Heart Rate (bpm)", 50, 250, value=st.session_state.data_max_hr, key="data_max_hr_widget")
-                oldpeak = st.number_input("ST Depression (Oldpeak)", -3.0, 7.0, value=st.session_state.data_oldpeak, step=0.1, key="data_oldpeak_widget")
+                age = st.number_input("Age (years)", 18, 100, key="data_age_widget")
+                resting_bp = st.number_input("Resting BP (mmHg)", 60, 250, key="data_resting_bp_widget")
+                cholesterol = st.number_input("Cholesterol (mg/dl)", 0, 700, key="data_cholesterol_widget")
+                max_hr = st.number_input("Max Heart Rate (bpm)", 50, 250, key="data_max_hr_widget")
+                oldpeak = st.number_input("ST Depression (Oldpeak)", -3.0, 7.0, step=0.1, key="data_oldpeak_widget")
             with fc2:
-                sex = st.selectbox("Sex", [1, 0], format_func=lambda x: "Male" if x == 1 else "Female", index=0 if st.session_state.data_sex == 1 else 1, key="data_sex_widget")
+                sex = st.selectbox("Sex", [1, 0], format_func=lambda x: "Male" if x == 1 else "Female", key="data_sex_widget")
                 chest_pain = st.selectbox("Chest Pain Type", [1, 2, 3, 4],
-                    format_func=lambda x: {1:"1 — Typical Angina", 2:"2 — Atypical Angina", 3:"3 — Non-Anginal", 4:"4 — Asymptomatic"}[x], index=st.session_state.data_chest_pain-1, key="data_chest_pain_widget")
+                    format_func=lambda x: {1:"1 — Typical Angina", 2:"2 — Atypical Angina", 3:"3 — Non-Anginal", 4:"4 — Asymptomatic"}[x], key="data_chest_pain_widget")
                 resting_ecg = st.selectbox("Resting ECG", [0, 1, 2],
-                    format_func=lambda x: {0:"0 — Normal", 1:"1 — ST-T Wave", 2:"2 — LV Hypertrophy"}[x], index=st.session_state.data_resting_ecg, key="data_resting_ecg_widget")
+                    format_func=lambda x: {0:"0 — Normal", 1:"1 — ST-T Wave", 2:"2 — LV Hypertrophy"}[x], key="data_resting_ecg_widget")
                 st_slope = st.selectbox("ST Slope", [1, 2, 3],
-                    format_func=lambda x: {1:"1 — Upsloping", 2:"2 — Flat", 3:"3 — Downsloping"}[x], index=st.session_state.data_st_slope-1, key="data_st_slope_widget")
-                fbs = st.toggle("Fasting Blood Sugar >120", value=st.session_state.data_fbs, key="data_fbs_widget")
-                ex_angina = st.toggle("Exercise Induced Angina", value=st.session_state.data_ex_angina, key="data_ex_angina_widget")
+                    format_func=lambda x: {1:"1 — Upsloping", 2:"2 — Flat", 3:"3 — Downsloping"}[x], key="data_st_slope_widget")
+                fbs = st.toggle("Fasting Blood Sugar >120", key="data_fbs_widget")
+                ex_angina = st.toggle("Exercise Induced Angina", key="data_ex_angina_widget")
             
-            # Quick load buttons
+            # Quick load buttons — write directly to widget keys
             qc1, qc2 = st.columns(2)
             with qc1:
                 if st.button("Load Low Risk Sample", width="stretch", key="data_load_low"):
                     # Low risk: Age 40, Sex 1 (Male), Chest pain type 2 (Atypical Angina),
                     # Resting bp 140, Cholesterol 289, FBS 0, Resting ECG 0 (Normal),
                     # Max HR 172, Exercise angina 0, Oldpeak 0.0, ST slope 1 (Upsloping), Target 0
-                    st.session_state.data_age = 40
-                    st.session_state.data_sex = 1
-                    st.session_state.data_chest_pain = 2
-                    st.session_state.data_resting_bp = 140
-                    st.session_state.data_cholesterol = 289
-                    st.session_state.data_fbs = False
-                    st.session_state.data_resting_ecg = 0
-                    st.session_state.data_max_hr = 172
-                    st.session_state.data_ex_angina = False
-                    st.session_state.data_oldpeak = 0.0
-                    st.session_state.data_st_slope = 1
+                    st.session_state.data_age_widget = 40
+                    st.session_state.data_sex_widget = 1
+                    st.session_state.data_chest_pain_widget = 2
+                    st.session_state.data_resting_bp_widget = 140
+                    st.session_state.data_cholesterol_widget = 289
+                    st.session_state.data_fbs_widget = False
+                    st.session_state.data_resting_ecg_widget = 0
+                    st.session_state.data_max_hr_widget = 172
+                    st.session_state.data_ex_angina_widget = False
+                    st.session_state.data_oldpeak_widget = 0.0
+                    st.session_state.data_st_slope_widget = 1
                     st.rerun()
             with qc2:
                 if st.button("Load High Risk Sample", width="stretch", key="data_load_high"):
                     # High risk: Age 49, Sex 0 (Female), Chest pain type 3 (Non-Anginal),
                     # Resting bp 160, Cholesterol 180, FBS 0, Resting ECG 0 (Normal),
                     # Max HR 156, Exercise angina 0, Oldpeak 1.0, ST slope 2 (Flat), Target 1
-                    st.session_state.data_age = 49
-                    st.session_state.data_sex = 0
-                    st.session_state.data_chest_pain = 3
-                    st.session_state.data_resting_bp = 160
-                    st.session_state.data_cholesterol = 180
-                    st.session_state.data_fbs = False
-                    st.session_state.data_resting_ecg = 0
-                    st.session_state.data_max_hr = 156
-                    st.session_state.data_ex_angina = False
-                    st.session_state.data_oldpeak = 1.0
-                    st.session_state.data_st_slope = 2
+                    st.session_state.data_age_widget = 49
+                    st.session_state.data_sex_widget = 0
+                    st.session_state.data_chest_pain_widget = 3
+                    st.session_state.data_resting_bp_widget = 160
+                    st.session_state.data_cholesterol_widget = 180
+                    st.session_state.data_fbs_widget = False
+                    st.session_state.data_resting_ecg_widget = 0
+                    st.session_state.data_max_hr_widget = 156
+                    st.session_state.data_ex_angina_widget = False
+                    st.session_state.data_oldpeak_widget = 1.0
+                    st.session_state.data_st_slope_widget = 2
                     st.rerun()
             
             if st.button("Analyze Patient Data", type="primary", width="stretch", key="data_analyze_btn", disabled=not rf_ready):
