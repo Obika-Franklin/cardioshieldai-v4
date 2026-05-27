@@ -268,6 +268,29 @@ def inject_custom_css():
             text-align: center;
             margin-bottom: 16px;
         }
+        
+        /* Model status indicator */
+        .model-status {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 9999px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .model-status-loaded {
+            background: #D1FAE5;
+            color: #065F46;
+            border: 1px solid #A7F3D0;
+        }
+        
+        .model-status-missing {
+            background: #FEE2E2;
+            color: #991B1B;
+            border: 1px solid #FECACA;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -289,9 +312,9 @@ def icon(name, size="", color="", cls=""):
 MODEL_DIR = Path("models")
 MODEL_DIR.mkdir(exist_ok=True)
 
-PREPROCESSOR_URL = "https://github.com/FranklinObika/cardioshield-ai/releases/download/v1.0.0/preprocessor.pkl"
-RF_MODEL_URL = "https://github.com/FranklinObika/cardioshield-ai/releases/download/v1.0.0/rf_model.pkl"
-VGG16_MODEL_URL = "https://github.com/FranklinObika/cardioshield-ai/releases/download/v1.0.0/vgg16_ecg_model.keras"
+PREPROCESSOR_URL = "https://github.com/Obika-Franklin/cardioshield-ai/releases/download/preprocessor/preprocessor.pkl"
+RF_MODEL_URL = "https://github.com/Obika-Franklin/cardioshield-ai/releases/download/rf_model/rf_model.pkl"
+VGG16_MODEL_URL = "https://github.com/Obika-Franklin/cardioshield-ai/releases/download/v1.0.0/vgg16_ecg_model.keras"
 
 @st.cache_resource
 def download_file(url, filename):
@@ -313,6 +336,10 @@ def download_file(url, filename):
 @st.cache_resource
 def load_models():
     """Load or download all required models"""
+    preprocessor = None
+    rf_model = None
+    vgg16_model = None
+    
     try:
         preprocessor_path = download_file(PREPROCESSOR_URL, "preprocessor.pkl")
         rf_model_path = download_file(RF_MODEL_URL, "rf_model.pkl")
@@ -321,10 +348,7 @@ def load_models():
         if preprocessor_path and rf_model_path:
             preprocessor = joblib.load(preprocessor_path)
             rf_model = joblib.load(rf_model_path)
-        else:
-            preprocessor, rf_model = None, None
         
-        vgg16_model = None
         if vgg16_model_path:
             try:
                 from tensorflow.keras.models import load_model
@@ -332,10 +356,10 @@ def load_models():
             except Exception:
                 pass
         
-        return preprocessor, rf_model, vgg16_model
     except Exception as e:
-        st.warning(f"Model loading issue: {e}. Using simulation mode.")
-        return None, None, None
+        st.error(f"Model loading failed: {e}")
+    
+    return preprocessor, rf_model, vgg16_model
 
 # ============================================================================
 # FEATURE IMPORTANCE AGGREGATION
@@ -355,17 +379,14 @@ def get_aggregated_feature_importance(rf_model, preprocessor):
         n_features = len(raw_importances)
         
         if n_features == 11:
-            # Already aggregated, use directly
             feature_names = ['age', 'sex', 'chest pain type', 'resting bp s', 'cholesterol',
                            'fasting blood sugar', 'resting ecg', 'max heart rate',
                            'exercise angina', 'oldpeak', 'ST slope']
             return {name: float(imp) for name, imp in zip(feature_names, raw_importances)}
         
         elif n_features == 22:
-            # 22 post-OHE features → aggregate to 11 originals
             ohe_names = preprocessor.get_feature_names_out()
             
-            # Map original features to their OHE variants
             feature_groups = {
                 'age': ['age'],
                 'sex': ['sex'],
@@ -380,7 +401,6 @@ def get_aggregated_feature_importance(rf_model, preprocessor):
                 'ST slope': ['ST slope']
             }
             
-            # Aggregate by summing importance of all OHE variants for each original feature
             aggregated = {}
             for orig_name, variants in feature_groups.items():
                 total_imp = 0.0
@@ -394,7 +414,6 @@ def get_aggregated_feature_importance(rf_model, preprocessor):
             return aggregated
         
         else:
-            # Unexpected number, use as-is with generic names
             return {f"feature_{i}": float(imp) for i, imp in enumerate(raw_importances)}
     
     except Exception:
@@ -431,139 +450,87 @@ def get_waitlist_count():
     return init_db().execute('SELECT COUNT(*) FROM waitlist').fetchone()[0]
 
 # ============================================================================
-# INFERENCE
+# INFERENCE (NO SIMULATION FALLBACKS)
 # ============================================================================
 
 def predict_rf(patient_data, preprocessor, rf_model):
-    """RF prediction with fallback to simulation"""
+    """RF prediction — requires models to be loaded"""
     if preprocessor is None or rf_model is None:
-        return simulate_rf_prediction(patient_data)
+        raise RuntimeError("Models not loaded. Please wait for models to download.")
     
-    try:
-        df = pd.DataFrame([patient_data])
-        X_processed = preprocessor.transform(df)
-        proba = rf_model.predict_proba(X_processed)[0]
-        risk_score = proba[1] * 100
-        
-        if risk_score >= 70:
-            risk_level = "high"
-            recommendation = "Patient exhibits multiple cardiovascular risk factors. Immediate cardiology referral recommended. Consider stress testing and comprehensive lipid panel."
-        elif risk_score >= 30:
-            risk_level = "moderate"
-            recommendation = "Moderate cardiovascular risk detected. Monitor patient closely and consider lifestyle interventions. Follow-up in 3-6 months with repeat assessment."
-        else:
-            risk_level = "low"
-            recommendation = "Low cardiovascular risk profile. Continue routine preventive care. Maintain healthy lifestyle and schedule annual check-up."
-        
-        # Get aggregated feature importance from the real model
-        agg_importance = get_aggregated_feature_importance(rf_model, preprocessor)
-        features = []
-        if agg_importance:
-            features = [{"name": k, "importance": v} for k, v in agg_importance.items()]
-            features.sort(key=lambda x: x["importance"], reverse=True)
-        
-        return {
-            "riskScore": risk_score,
-            "riskLevel": risk_level,
-            "rfProbability": proba[1],
-            "recommendation": recommendation,
-            "modelAccuracy": 0.9202,
-            "features": features
-        }
-    except Exception:
-        return simulate_rf_prediction(patient_data)
-
-def simulate_rf_prediction(patient_data):
-    risk_score = 0
-    if patient_data.get('age', 45) > 60: risk_score += 25
-    elif patient_data.get('age', 45) > 45: risk_score += 15
-    if patient_data.get('sex', 1) == 1: risk_score += 10
-    if patient_data.get('chestPainType', 2) >= 3: risk_score += 20
-    elif patient_data.get('chestPainType', 2) == 2: risk_score += 10
-    if patient_data.get('restingBpS', 130) > 140: risk_score += 15
-    if patient_data.get('cholesterol', 220) > 240: risk_score += 15
-    if patient_data.get('fastingBloodSugar', 0) == 1: risk_score += 10
-    if patient_data.get('exerciseAngina', 0) == 1: risk_score += 20
-    if patient_data.get('oldpeak', 0) > 1.5: risk_score += 15
-    if patient_data.get('stSlope', 1) >= 2: risk_score += 15
+    df = pd.DataFrame([patient_data])
+    X_processed = preprocessor.transform(df)
+    proba = rf_model.predict_proba(X_processed)[0]
+    risk_score = proba[1] * 100
     
-    risk_score = min(max(risk_score, 2), 98)
-    
-    if risk_score >= 70: risk_level = "high"
-    elif risk_score >= 30: risk_level = "moderate"
-    else: risk_level = "low"
-    
-    if risk_level == "high":
-        recommendation = "Patient exhibits multiple cardiovascular risk factors. Immediate cardiology referral recommended."
-    elif risk_level == "moderate":
-        recommendation = "Moderate cardiovascular risk detected. Monitor patient closely and consider lifestyle interventions."
+    if risk_score >= 70:
+        risk_level = "high"
+        recommendation = "Patient exhibits multiple cardiovascular risk factors. Immediate cardiology referral recommended. Consider stress testing and comprehensive lipid panel."
+    elif risk_score >= 30:
+        risk_level = "moderate"
+        recommendation = "Moderate cardiovascular risk detected. Monitor patient closely and consider lifestyle interventions. Follow-up in 3-6 months with repeat assessment."
     else:
-        recommendation = "Low cardiovascular risk profile. Continue routine preventive care."
+        risk_level = "low"
+        recommendation = "Low cardiovascular risk profile. Continue routine preventive care. Maintain healthy lifestyle and schedule annual check-up."
     
-    features = [
-        {"name": "age", "importance": 0.22},
-        {"name": "chest pain type", "importance": 0.18},
-        {"name": "max heart rate", "importance": 0.15},
-        {"name": "oldpeak", "importance": 0.13},
-        {"name": "exercise angina", "importance": 0.11},
-        {"name": "ST slope", "importance": 0.08},
-        {"name": "resting bp s", "importance": 0.05},
-        {"name": "cholesterol", "importance": 0.04},
-        {"name": "sex", "importance": 0.02},
-        {"name": "fasting blood sugar", "importance": 0.01},
-        {"name": "resting ecg", "importance": 0.01}
-    ]
+    agg_importance = get_aggregated_feature_importance(rf_model, preprocessor)
+    features = []
+    if agg_importance:
+        features = [{"name": k, "importance": v} for k, v in agg_importance.items()]
+        features.sort(key=lambda x: x["importance"], reverse=True)
     
     return {
         "riskScore": risk_score,
         "riskLevel": risk_level,
-        "rfProbability": risk_score / 100,
+        "rfProbability": proba[1],
         "recommendation": recommendation,
         "modelAccuracy": 0.9202,
         "features": features
     }
 
 def predict_ecg(image_data, vgg16_model):
+    """VGG16 ECG classification — requires model to be loaded"""
     if vgg16_model is None:
-        return simulate_ecg_prediction()
+        raise RuntimeError("VGG16 model not loaded. Please wait for model to download.")
     
-    try:
-        from tensorflow.keras.preprocessing import image as keras_image
-        img = Image.open(BytesIO(base64.b64decode(image_data)))
-        img = img.resize((100, 100)).convert('RGB')
-        img_array = keras_image.img_to_array(img)
-        img_array = np.expand_dims(img_array, axis=0) / 255.0
-        
-        predictions = vgg16_model.predict(img_array, verbose=0)[0]
-        classes = ['abnormal_heartbeat', 'history_mi', 'myocardial_infarction', 'normal']
-        
-        predicted_idx = np.argmax(predictions)
-        confidence = float(predictions[predicted_idx])
-        classification = classes[predicted_idx]
-        
-        findings_map = {
-            'normal': "Normal sinus rhythm. Regular P-QRS-T waveform pattern. No ST segment abnormalities detected. Heart rate within normal range.",
-            'myocardial_infarction': "ST segment elevation detected. Pathological Q waves present. Findings consistent with acute myocardial infarction. Urgent cardiology evaluation required.",
-            'history_mi': "Residual Q waves detected. T-wave inversion noted. Findings suggest prior myocardial infarction. Continued monitoring and follow-up recommended.",
-            'abnormal_heartbeat': "Irregular rhythm pattern detected. Varying QRS amplitudes. Abnormal heartbeat morphology. Further diagnostic workup advised."
-        }
-        
-        risk_map = {'normal': 'low', 'myocardial_infarction': 'high', 'history_mi': 'moderate', 'abnormal_heartbeat': 'moderate'}
-        
-        return {
-            "classification": classification.replace('_', ' ').title(),
-            "confidence": confidence,
-            "findings": findings_map.get(classification, ""),
-            "riskLevel": risk_map.get(classification, "moderate"),
-            "modelAccuracy": 0.7483,
-            "modelName": "CNN VGG16",
-            "isDemo": False,
-            "probabilities": {classes[i]: float(predictions[i]) for i in range(len(classes))}
-        }
-    except Exception:
-        return simulate_ecg_prediction()
+    from tensorflow.keras.preprocessing import image as keras_image
+    img = Image.open(BytesIO(base64.b64decode(image_data)))
+    img = img.resize((100, 100)).convert('RGB')
+    img_array = keras_image.img_to_array(img)
+    img_array = np.expand_dims(img_array, axis=0) / 255.0
+    
+    predictions = vgg16_model.predict(img_array, verbose=0)[0]
+    classes = ['abnormal_heartbeat', 'history_mi', 'myocardial_infarction', 'normal']
+    
+    predicted_idx = np.argmax(predictions)
+    confidence = float(predictions[predicted_idx])
+    classification = classes[predicted_idx]
+    
+    findings_map = {
+        'normal': "Normal sinus rhythm. Regular P-QRS-T waveform pattern. No ST segment abnormalities detected. Heart rate within normal range.",
+        'myocardial_infarction': "ST segment elevation detected. Pathological Q waves present. Findings consistent with acute myocardial infarction. Urgent cardiology evaluation required.",
+        'history_mi': "Residual Q waves detected. T-wave inversion noted. Findings suggest prior myocardial infarction. Continued monitoring and follow-up recommended.",
+        'abnormal_heartbeat': "Irregular rhythm pattern detected. Varying QRS amplitudes. Abnormal heartbeat morphology. Further diagnostic workup advised."
+    }
+    
+    risk_map = {'normal': 'low', 'myocardial_infarction': 'high', 'history_mi': 'moderate', 'abnormal_heartbeat': 'moderate'}
+    
+    return {
+        "classification": classification.replace('_', ' ').title(),
+        "confidence": confidence,
+        "findings": findings_map.get(classification, ""),
+        "riskLevel": risk_map.get(classification, "moderate"),
+        "modelAccuracy": 0.7483,
+        "modelName": "CNN VGG16",
+        "isDemo": False,
+        "probabilities": {classes[i]: float(predictions[i]) for i in range(len(classes))}
+    }
 
-def simulate_ecg_prediction(is_demo=True):
+def simulate_ecg_for_demo(vgg16_model):
+    """
+    Generate a simulated ECG result for demo samples.
+    This is used for the built-in SVG samples (not real uploaded images).
+    """
     return {
         "classification": "Normal Sinus Rhythm",
         "confidence": 0.92,
@@ -571,7 +538,7 @@ def simulate_ecg_prediction(is_demo=True):
         "riskLevel": "low",
         "modelAccuracy": 0.7483,
         "modelName": "CNN VGG16",
-        "isDemo": is_demo,
+        "isDemo": True,
         "probabilities": {
             "normal": 0.92,
             "myocardial_infarction": 0.03,
@@ -613,12 +580,12 @@ def combine_results(rf_result, ecg_result=None):
     }
 
 # ============================================================================
-# CHARTS
+# CHART RENDERERS
 # ============================================================================
 
 def render_risk_gauge(score, risk_level):
     colors = {"low": ("#2EC4B6", "#E6F7F5"), "moderate": ("#F59E0B", "#FEF3C7"), "high": ("#EF4444", "#FEE2E2")}
-    gauge_color, track_color = colors.get(risk_level, colors["low"])
+    gauge_color, _ = colors.get(risk_level, colors["low"])
     
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
@@ -849,6 +816,10 @@ def main():
     
     preprocessor, rf_model, vgg16_model = load_models()
     
+    # Model status flags
+    rf_ready = preprocessor is not None and rf_model is not None
+    vgg16_ready = vgg16_model is not None
+    
     defaults = {
         'ecg_sample': None,
         'ecg_image': None,
@@ -871,6 +842,12 @@ def main():
     header_clock = icon("fa-stopwatch", "", "#2EC4B6")
     header_db = icon("fa-database", "", "#2EC4B6")
     
+    # Model status badges
+    rf_status_class = "model-status-loaded" if rf_ready else "model-status-missing"
+    rf_status_text = "RF LOADED" if rf_ready else "RF MISSING"
+    vgg_status_class = "model-status-loaded" if vgg16_ready else "model-status-missing"
+    vgg_status_text = "VGG16 LOADED" if vgg16_ready else "VGG16 MISSING"
+    
     st.markdown(f"""
     <div class="custom-header">
         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -882,7 +859,11 @@ def main():
                 </div>
                 <div>
                     <h1 style="color: white; margin: 0; font-size: 1.5rem; font-weight: 700;">CardioShield AI</h1>
-                    <p style="color: rgba(255,255,255,0.6); margin: 0; font-size: 0.8rem;">Cardiovascular Risk Prediction</p>
+                    <p style="color: rgba(255,255,255,0.6); margin: 0; font-size: 0.8rem;">
+                        Cardiovascular Risk Prediction
+                        <span class="model-status {rf_status_class}" style="margin-left:8px;">{rf_status_text}</span>
+                        <span class="model-status {vgg_status_class}" style="margin-left:4px;">{vgg_status_text}</span>
+                    </p>
                 </div>
             </div>
         </div>
@@ -926,6 +907,12 @@ def main():
         </div>
     </div>
     """, unsafe_allow_html=True)
+    
+    # Show warning if models aren't loaded
+    if not rf_ready:
+        st.error("RF model not loaded. Predictions will fail. Check model download URLs.")
+    if not vgg16_ready:
+        st.warning("VGG16 model not loaded. ECG predictions will fail. Demo samples will use placeholder results.")
     
     # ========================================================================
     # TABS
@@ -977,7 +964,7 @@ def main():
                 fbs = st.toggle("Fasting Blood Sugar >120", key="dual_fbs")
                 ex_angina = st.toggle("Exercise Induced Angina", key="dual_ex_angina")
             
-            if st.button("Analyze Patient Data", type="primary", width="stretch", key="dual_analyze_btn"):
+            if st.button("Analyze Patient Data", type="primary", width="stretch", key="dual_analyze_btn", disabled=not rf_ready):
                 patient_data = {
                     "patientName": patient_name, "age": age, "sex": sex,
                     "chestPainType": chest_pain, "restingBpS": resting_bp,
@@ -986,16 +973,19 @@ def main():
                     "exerciseAngina": 1 if ex_angina else 0, "oldpeak": oldpeak, "stSlope": st_slope
                 }
                 with st.spinner("Running dual-model analysis..."):
-                    st.session_state.rf_result = predict_rf(patient_data, preprocessor, rf_model)
-                    if st.session_state.ecg_image:
-                        st.session_state.ecg_result = predict_ecg(st.session_state.ecg_image, vgg16_model)
-                        st.session_state.dual_result = combine_results(st.session_state.rf_result, st.session_state.ecg_result)
-                    elif st.session_state.ecg_sample:
-                        st.session_state.ecg_result = simulate_ecg_prediction(is_demo=True)
-                        st.session_state.dual_result = combine_results(st.session_state.rf_result, st.session_state.ecg_result)
-                    else:
-                        st.session_state.dual_result = combine_results(st.session_state.rf_result, None)
-                        st.session_state.ecg_result = None
+                    try:
+                        st.session_state.rf_result = predict_rf(patient_data, preprocessor, rf_model)
+                        if st.session_state.ecg_image and vgg16_ready:
+                            st.session_state.ecg_result = predict_ecg(st.session_state.ecg_image, vgg16_model)
+                            st.session_state.dual_result = combine_results(st.session_state.rf_result, st.session_state.ecg_result)
+                        elif st.session_state.ecg_sample:
+                            st.session_state.ecg_result = simulate_ecg_for_demo(vgg16_model)
+                            st.session_state.dual_result = combine_results(st.session_state.rf_result, st.session_state.ecg_result)
+                        else:
+                            st.session_state.dual_result = combine_results(st.session_state.rf_result, None)
+                            st.session_state.ecg_result = None
+                    except Exception as e:
+                        st.error(f"Prediction failed: {e}")
         
         with col2:
             st.markdown("#### ECG Image Scanner")
@@ -1178,13 +1168,17 @@ def main():
                 st.image(uploaded_file, caption="Uploaded ECG", width='stretch')
             
             has_ecg = bool(st.session_state.ecg_sample or st.session_state.ecg_image)
+            can_analyze = has_ecg and (vgg16_ready or st.session_state.ecg_sample)
             
-            if st.button("Analyze ECG", type="primary", width="stretch", disabled=not has_ecg, key="ecg_only_analyze"):
-                if st.session_state.ecg_image:
+            if st.button("Analyze ECG", type="primary", width="stretch", disabled=not can_analyze, key="ecg_only_analyze"):
+                if st.session_state.ecg_image and vgg16_ready:
                     with st.spinner("Processing ECG image with CNN VGG16..."):
-                        st.session_state.ecg_result = predict_ecg(st.session_state.ecg_image, vgg16_model)
+                        try:
+                            st.session_state.ecg_result = predict_ecg(st.session_state.ecg_image, vgg16_model)
+                        except Exception as e:
+                            st.error(f"ECG prediction failed: {e}")
                 elif st.session_state.ecg_sample:
-                    st.session_state.ecg_result = simulate_ecg_prediction(is_demo=True)
+                    st.session_state.ecg_result = simulate_ecg_for_demo(vgg16_model)
         
         with ec2:
             if st.session_state.ecg_result:
@@ -1242,7 +1236,7 @@ def main():
                 """, unsafe_allow_html=True)
     
     # ========================================================================
-    # TAB 3: DATA-ONLY
+    # TAB 3: DATA-ONLY (with new sample data)
     # ========================================================================
     
     with tab3:
@@ -1275,14 +1269,52 @@ def main():
             qc1, qc2 = st.columns(2)
             with qc1:
                 if st.button("Load Low Risk Sample", width="stretch", key="data_load_low"):
-                    st.session_state.data_preset = "low"
+                    st.session_state.data_preset_low = True
                     st.rerun()
             with qc2:
                 if st.button("Load High Risk Sample", width="stretch", key="data_load_high"):
-                    st.session_state.data_preset = "high"
+                    st.session_state.data_preset_high = True
                     st.rerun()
             
-            if st.button("Analyze Patient Data", type="primary", width="stretch", key="data_analyze_btn"):
+            # Apply low risk preset
+            # Low risk: Age 40, Sex 1 (Male), Chest pain type 2 (Atypical Angina),
+            # Resting bp 140, Cholesterol 289, FBS 0, Resting ECG 0 (Normal),
+            # Max HR 172, Exercise angina 0, Oldpeak 0.0, ST slope 1 (Upsloping), Target 0
+            if st.session_state.get('data_preset_low'):
+                age = 40
+                sex = 1  # Male
+                chest_pain = 2  # Atypical Angina
+                resting_bp = 140
+                cholesterol = 289
+                fbs = False  # 0
+                resting_ecg = 0  # Normal
+                max_hr = 172
+                ex_angina = False  # 0
+                oldpeak = 0.0
+                st_slope = 1  # Upsloping
+                st.session_state.data_preset_low = False
+                st.rerun()
+            
+            # Apply high risk preset
+            # High risk: Age 49, Sex 0 (Female), Chest pain type 3 (Non-Anginal),
+            # Resting bp 160, Cholesterol 180, FBS 0, Resting ECG 0 (Normal),
+            # Max HR 156, Exercise angina 0, Oldpeak 1.0, ST slope 2 (Flat), Target 1
+            if st.session_state.get('data_preset_high'):
+                age = 49
+                sex = 0  # Female
+                chest_pain = 3  # Non-Anginal Pain
+                resting_bp = 160
+                cholesterol = 180
+                fbs = False  # 0
+                resting_ecg = 0  # Normal
+                max_hr = 156
+                ex_angina = False  # 0
+                oldpeak = 1.0
+                st_slope = 2  # Flat
+                st.session_state.data_preset_high = False
+                st.rerun()
+            
+            if st.button("Analyze Patient Data", type="primary", width="stretch", key="data_analyze_btn", disabled=not rf_ready):
                 patient_data = {
                     "patientName": patient_name, "age": age, "sex": sex,
                     "chestPainType": chest_pain, "restingBpS": resting_bp,
@@ -1291,7 +1323,10 @@ def main():
                     "exerciseAngina": 1 if ex_angina else 0, "oldpeak": oldpeak, "stSlope": st_slope
                 }
                 with st.spinner("Analyzing patient data with Random Forest + SMOTE..."):
-                    st.session_state.data_rf_result = predict_rf(patient_data, preprocessor, rf_model)
+                    try:
+                        st.session_state.data_rf_result = predict_rf(patient_data, preprocessor, rf_model)
+                    except Exception as e:
+                        st.error(f"RF prediction failed: {e}")
         
         with dc2:
             if st.session_state.data_rf_result:
