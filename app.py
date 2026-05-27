@@ -394,7 +394,7 @@ def fetch_demo_ecg(sample_type):
 # ============================================================================
 # FEATURE IMPORTANCE AGGREGATION
 # ============================================================================
-
+@st.cache_resource
 def get_aggregated_feature_importance(_rf_model, _preprocessor):
     """Aggregate feature importance from post-OHE features back to original clinical features"""
     if _rf_model is None or _preprocessor is None:
