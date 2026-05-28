@@ -1080,7 +1080,7 @@ def main():
         "Investor Brief"
     ])
     
-    # ========================================================================
+        # ========================================================================
     # TAB 1: DUAL MODE
     # ========================================================================
     
@@ -1161,37 +1161,37 @@ def main():
                 dual_disabled = not rf_ready or not has_ecg_input
                 
                 if st.button("Analyze Patient Data", type="primary", width="stretch", key="dual_analyze_btn", disabled=dual_disabled):
-                    patient_data = {
-                        "patientName": patient_name, "age": age, "sex": sex,
-                        "chestPainType": chest_pain, "restingBpS": resting_bp,
-                        "cholesterol": cholesterol, "fastingBloodSugar": 1 if fbs else 0,
-                        "restingEcg": resting_ecg, "maxHeartRate": max_hr,
-                        "exerciseAngina": 1 if ex_angina else 0, "oldpeak": oldpeak, "stSlope": st_slope
-                    }
-                    with st.spinner("Running dual-model analysis..."):
-                        time.sleep(0.5)
-                        try:
-                            st.session_state.rf_result = predict_rf(patient_data, preprocessor, rf_model)
-                            if st.session_state.ecg_image and vgg16_ready:
-                                st.session_state.ecg_result = predict_ecg(st.session_state.ecg_image, vgg16_model)
-                                st.session_state.dual_result = combine_results(st.session_state.rf_result, st.session_state.ecg_result)
-                            elif st.session_state.ecg_sample and vgg16_ready:
-                                demo_image = fetch_demo_ecg(st.session_state.ecg_sample)
-                                if demo_image:
-                                    st.session_state.ecg_result = predict_ecg(demo_image, vgg16_model)
+                    if not has_ecg_input:
+                        st.warning("Please select a demo ECG sample or upload an ECG image before analysis.")
+                    else:
+                        patient_data = {
+                            "patientName": patient_name, "age": age, "sex": sex,
+                            "chestPainType": chest_pain, "restingBpS": resting_bp,
+                            "cholesterol": cholesterol, "fastingBloodSugar": 1 if fbs else 0,
+                            "restingEcg": resting_ecg, "maxHeartRate": max_hr,
+                            "exerciseAngina": 1 if ex_angina else 0, "oldpeak": oldpeak, "stSlope": st_slope
+                        }
+                        with st.spinner("Running dual-model analysis..."):
+                            time.sleep(0.5)
+                            try:
+                                st.session_state.rf_result = predict_rf(patient_data, preprocessor, rf_model)
+                                if st.session_state.ecg_image and vgg16_ready:
+                                    st.session_state.ecg_result = predict_ecg(st.session_state.ecg_image, vgg16_model)
                                     st.session_state.dual_result = combine_results(st.session_state.rf_result, st.session_state.ecg_result)
-                            elif not vgg16_ready and (st.session_state.ecg_image or st.session_state.ecg_sample):
-                                st.error("VGG16 model not loaded. Cannot classify ECG.")
-                                st.session_state.dual_result = combine_results(st.session_state.rf_result, None)
-                                st.session_state.ecg_result = None
-                            else:
-                                st.session_state.dual_result = combine_results(st.session_state.rf_result, None)
-                                st.session_state.ecg_result = None
-                        except Exception as e:
-                            st.error(f"Prediction failed: {e}")
-                
-                if not has_ecg_input:
-                    st.warning("Please select a demo ECG sample or upload an ECG image before analysis.")
+                                elif st.session_state.ecg_sample and vgg16_ready:
+                                    demo_image = fetch_demo_ecg(st.session_state.ecg_sample)
+                                    if demo_image:
+                                        st.session_state.ecg_result = predict_ecg(demo_image, vgg16_model)
+                                        st.session_state.dual_result = combine_results(st.session_state.rf_result, st.session_state.ecg_result)
+                                elif not vgg16_ready and (st.session_state.ecg_image or st.session_state.ecg_sample):
+                                    st.error("VGG16 model not loaded. Cannot classify ECG.")
+                                    st.session_state.dual_result = combine_results(st.session_state.rf_result, None)
+                                    st.session_state.ecg_result = None
+                                else:
+                                    st.session_state.dual_result = combine_results(st.session_state.rf_result, None)
+                                    st.session_state.ecg_result = None
+                            except Exception as e:
+                                st.error(f"Prediction failed: {e}")
         
         with col2:
             with st.container(border=True):
@@ -1203,15 +1203,17 @@ def main():
                 current_idx = sample_options.index(st.session_state.ecg_sample) if st.session_state.ecg_sample in sample_options else 0
                 
                 selected = st.selectbox("Select demo sample or upload below", range(len(sample_options)),
-                                        format_func=lambda i: sample_labels[i], index=current_idx, key="dual_sample_select",
-                                        on_change=clear_ecg_results)
+                                        format_func=lambda i: sample_labels[i], index=current_idx, key="dual_sample_select")
                 
+                # Handle sample selection with direct change detection
                 if sample_options[selected] is not None:
                     new_sample = sample_options[selected]
                     if st.session_state.ecg_sample != new_sample:
                         st.session_state.ecg_sample = new_sample
                         st.session_state.ecg_image = None
                         st.session_state.ecg_preview_image = fetch_demo_ecg(new_sample)
+                        clear_ecg_results()
+                        st.rerun()
                     if st.session_state.ecg_preview_image:
                         try:
                             img_bytes = base64.b64decode(st.session_state.ecg_preview_image)
@@ -1221,21 +1223,28 @@ def main():
                     if not vgg16_ready:
                         st.warning("VGG16 model not loaded. Demo sample cannot be classified.")
                 else:
-                    st.session_state.ecg_sample = None
-                    st.session_state.ecg_preview_image = None
+                    if st.session_state.ecg_sample is not None:
+                        st.session_state.ecg_sample = None
+                        st.session_state.ecg_preview_image = None
+                        clear_ecg_results()
+                        st.rerun()
                 
-                uploaded_file = st.file_uploader("Upload ECG Image (PNG, JPG up to 20MB)", type=["png", "jpg", "jpeg"], key="dual_ecg_upload",
-                                                on_change=clear_ecg_results)
-                if uploaded_file:
-                    st.session_state.ecg_sample = None
-                    st.session_state.ecg_preview_image = None
-                    st.session_state.ecg_image = base64.b64encode(uploaded_file.getvalue()).decode()
+                uploaded_file = st.file_uploader("Upload ECG Image (PNG, JPG up to 20MB)", type=["png", "jpg", "jpeg"], key="dual_ecg_upload")
+                if uploaded_file is not None:
+                    # Check if this is a new upload
+                    new_image = base64.b64encode(uploaded_file.getvalue()).decode()
+                    if st.session_state.ecg_image != new_image:
+                        st.session_state.ecg_sample = None
+                        st.session_state.ecg_preview_image = None
+                        st.session_state.ecg_image = new_image
+                        clear_ecg_results()
+                        st.rerun()
                     st.image(uploaded_file, caption="Uploaded ECG", width='stretch')
                     if not vgg16_ready:
                         st.warning("VGG16 model not loaded. Uploaded ECG cannot be classified.")
                 
                 if not st.session_state.ecg_sample and not st.session_state.ecg_image:
-                    st.info("No ECG selected — RF + SMOTE will still run on patient vitals. Select a sample or upload an ECG to enable dual-model triage.")
+                    st.info("Select a demo ECG sample or upload an ECG image to enable dual-model analysis.")
         
         # Results
         if st.session_state.dual_result:
